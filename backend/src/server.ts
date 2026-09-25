@@ -7,6 +7,8 @@ import { Server as SocketIOServer } from "socket.io";
 import { env } from "./config/env.js";
 import { logger } from "./utils/logger.js";
 import { prisma } from "./services/prisma.js";
+import path from "node:path";
+import fs from "node:fs";
 import { authRoutes } from "./modules/auth/auth.routes.js";
 import { trackingRoutes } from "./modules/tracking/tracking.routes.js";
 import { webhookRoutes } from "./modules/tracking/webhooks/webhook.routes.js";
@@ -123,6 +125,23 @@ app.use("/api/auth", authRoutes);
 app.use(trackingRoutes);
 app.use(webhookRoutes);
 app.use(apiRoutes);
+
+// Static frontend serving fallback (both ports 3000 and 3001 work seamlessly)
+const frontendDist = path.resolve(process.cwd(), "../frontend/dist");
+if (fs.existsSync(frontendDist)) {
+  app.use(express.static(frontendDist));
+  app.get("*", (req: Request, res: Response, next: NextFunction) => {
+    if (
+      req.path.startsWith("/api") ||
+      req.path.startsWith("/s") ||
+      req.path.startsWith("/l") ||
+      req.path === "/health"
+    ) {
+      return next();
+    }
+    res.sendFile(path.join(frontendDist, "index.html"));
+  });
+}
 
 // Global Error Handler
 app.use((err: any, req: Request, res: Response, _next: NextFunction) => {

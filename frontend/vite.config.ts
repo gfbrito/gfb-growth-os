@@ -10,11 +10,11 @@ export default defineConfig({
         target: 'http://localhost:3001',
         changeOrigin: true,
       },
-      '/s': {
+      '^/s/.*': {
         target: 'http://localhost:3001',
         changeOrigin: true,
       },
-      '/l': {
+      '^/l/.*': {
         target: 'http://localhost:3001',
         changeOrigin: true,
       },
