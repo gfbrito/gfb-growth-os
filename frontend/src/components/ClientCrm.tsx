@@ -13,7 +13,16 @@ import {
   ArrowRight,
   Sparkles,
   ChevronRight,
-  AlertCircle
+  AlertCircle,
+  ShieldCheck,
+  Zap,
+  Activity,
+  Clock,
+  Database,
+  Globe,
+  Smartphone,
+  Tag,
+  RefreshCw,
 } from 'lucide-react';
 
 export function ClientCrm() {
@@ -24,6 +33,12 @@ export function ClientCrm() {
   const [searchLead, setSearchLead] = useState('');
   const [filterTemp, setFilterTemp] = useState<string>('ALL');
   const [selectedLead, setSelectedLead] = useState<any>(null);
+  const [leadProfileData, setLeadProfileData] = useState<any>(null);
+  const [isProfileLoading, setIsProfileLoading] = useState<boolean>(false);
+
+  // Webhook Simulation State
+  const [isSimulating, setIsSimulating] = useState<boolean>(false);
+  const [simulationStatus, setSimulationStatus] = useState<string | null>(null);
 
   // Products State
   const [products, setProducts] = useState<any[]>([]);
@@ -47,7 +62,7 @@ export function ClientCrm() {
   const [importSuccessResult, setImportSuccessResult] = useState<any>(null);
 
   // Fetch CRM initial data
-  useEffect(() => {
+  const reloadCrmData = () => {
     fetch('/api/crm/leads?clientId=cli_bruna_ppp')
       .then((res) => res.json())
       .then((data) => setLeads(data.leads || []))
@@ -62,7 +77,65 @@ export function ClientCrm() {
       .then((res) => res.json())
       .then((data) => setRecoveryItems(data.recoveryItems || []))
       .catch((err) => console.error(err));
+  };
+
+  useEffect(() => {
+    reloadCrmData();
   }, []);
+
+  // Abre Ficha 360° com Identity Graph
+  const handleOpenLeadProfile = (lead: any) => {
+    setSelectedLead(lead);
+    setIsProfileLoading(true);
+    setLeadProfileData(null);
+    fetch(`/api/crm/leads/${lead.id}/timeline`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success) {
+          setLeadProfileData(data);
+        }
+      })
+      .catch((err) => console.error(err))
+      .finally(() => setIsProfileLoading(false));
+  };
+
+  // Simula Webhook de Compra ou Carrinho
+  const handleRunSimulation = (type: 'PURCHASE' | 'CART_ABANDONED') => {
+    setIsSimulating(true);
+    setSimulationStatus(`Disparando webhook ${type}...`);
+    
+    fetch('/api/webhooks/simulate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type,
+        customerName: type === 'PURCHASE' ? 'Mariana Castro (Simulada)' : 'Lucas Alencar (Simulado)',
+        customerEmail: type === 'PURCHASE' ? 'mariana.castro@teste.com' : 'lucas.alencar@teste.com',
+        customerPhone: type === 'PURCHASE' ? '+5511998811223' : '+5511987722334',
+        productName: 'Programa Primeira Página (PPP)',
+        amountCents: 99700,
+        platform: 'KIWIFY',
+      }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        setSimulationStatus(
+          type === 'PURCHASE'
+            ? `✅ Venda de R$ 997 processada! CAPI disparado & Recuperação fechada.`
+            : `🛒 Carrinho registrado no motor de recuperação com deduplicação!`
+        );
+        reloadCrmData();
+        if (data.lead) {
+          handleOpenLeadProfile(data.lead);
+        }
+        setTimeout(() => setSimulationStatus(null), 6000);
+      })
+      .catch((err) => {
+        setSimulationStatus(`❌ Erro na simulação: ${err.message}`);
+      })
+      .finally(() => setIsSimulating(false));
+  };
+
 
   // Filter leads
   const filteredLeads = leads.filter((lead) => {
@@ -197,6 +270,111 @@ Renata Albuquerque,renata.albuquerque@gmail.com,61999887766,Renovação Acupuntu
       {/* ======================================================== */}
       {crmSubTab === 'leads' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {/* Real-Time Webhook Simulator Banner */}
+          <div
+            className="glass-panel"
+            style={{
+              padding: '14px 20px',
+              background: 'linear-gradient(90deg, rgba(6, 182, 212, 0.08) 0%, rgba(16, 185, 129, 0.08) 100%)',
+              border: '1px solid rgba(6, 182, 212, 0.3)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '12px',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div
+                style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '8px',
+                  background: 'rgba(6, 182, 212, 0.2)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'var(--accent-cyan)',
+                }}
+              >
+                <Zap size={20} />
+              </div>
+              <div>
+                <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  Simulador de Webhooks & Cruzamento de Leads em Tempo Real
+                  <span className="badge badge-cyan" style={{ fontSize: '0.62rem' }}>Identity Graph Ativo</span>
+                </div>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>
+                  Teste em 1 clique o ciclo completo: Webhook Kiwify → Atualização de Lead → Fechamento de Recuperação → Meta CAPI.
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <button
+                onClick={() => handleRunSimulation('PURCHASE')}
+                disabled={isSimulating}
+                className="btn btn-primary"
+                style={{
+                  fontSize: '0.75rem',
+                  padding: '6px 12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  background: 'linear-gradient(135deg, #10B981, #059669)',
+                }}
+              >
+                <Sparkles size={14} />
+                {isSimulating ? 'Disparando...' : '⚡ Simular Compra Kiwify (R$ 997)'}
+              </button>
+
+              <button
+                onClick={() => handleRunSimulation('CART_ABANDONED')}
+                disabled={isSimulating}
+                className="btn btn-secondary"
+                style={{
+                  fontSize: '0.75rem',
+                  padding: '6px 12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  border: '1px solid rgba(245, 158, 11, 0.4)',
+                  color: 'var(--accent-amber)',
+                }}
+              >
+                🛒 Simular Carrinho
+              </button>
+
+              <button
+                onClick={reloadCrmData}
+                className="btn btn-secondary"
+                title="Recarregar dados"
+                style={{ padding: '6px 10px', fontSize: '0.75rem' }}
+              >
+                <RefreshCw size={14} />
+              </button>
+            </div>
+          </div>
+
+          {simulationStatus && (
+            <div
+              style={{
+                background: 'rgba(16, 185, 129, 0.15)',
+                border: '1px solid rgba(16, 185, 129, 0.4)',
+                borderRadius: '8px',
+                padding: '10px 14px',
+                fontSize: '0.8rem',
+                color: '#fff',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+              }}
+            >
+              <CheckCircle size={16} color="var(--accent-green)" />
+              {simulationStatus}
+            </div>
+          )}
+
           {/* Search & Filter Bar */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, maxWidth: '480px' }}>
@@ -264,8 +442,10 @@ Renata Albuquerque,renata.albuquerque@gmail.com,61999887766,Renovação Acupuntu
                 {filteredLeads.map((lead) => (
                   <tr
                     key={lead.id}
+                    onClick={() => handleOpenLeadProfile(lead)}
                     style={{
                       borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
+                      cursor: 'pointer',
                       transition: 'background 0.15s',
                     }}
                   >
@@ -278,6 +458,7 @@ Renata Albuquerque,renata.albuquerque@gmail.com,61999887766,Renovação Acupuntu
                         href={`https://wa.me/${lead.phone.replace(/\D/g, '')}`}
                         target="_blank"
                         rel="noreferrer"
+                        onClick={(e) => e.stopPropagation()}
                         style={{ color: 'var(--accent-cyan)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}
                       >
                         <MessageCircle size={13} />
@@ -304,11 +485,14 @@ Renata Albuquerque,renata.albuquerque@gmail.com,61999887766,Renovação Acupuntu
                     </td>
                     <td style={{ padding: '14px 16px', textAlign: 'right' }}>
                       <button
-                        onClick={() => setSelectedLead(lead)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenLeadProfile(lead);
+                        }}
                         className="btn btn-secondary"
                         style={{ padding: '4px 10px', fontSize: '0.72rem' }}
                       >
-                        Ver Ficha
+                        Ver Ficha 360°
                       </button>
                     </td>
                   </tr>
@@ -686,89 +870,221 @@ Renata Albuquerque,renata.albuquerque@gmail.com,61999887766,Renovação Acupuntu
         </div>
       )}
 
-      {/* Drawer: Ficha do Lead Selecionado */}
+      {/* Drawer: Ficha 360° do Lead (Identity Graph) */}
       {selectedLead && (
         <div
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0, 0, 0, 0.7)',
-            backdropFilter: 'blur(6px)',
+            background: 'rgba(0, 0, 0, 0.75)',
+            backdropFilter: 'blur(8px)',
             display: 'flex',
             justifyContent: 'flex-end',
             zIndex: 100,
           }}
-          onClick={() => setSelectedLead(null)}
+          onClick={() => {
+            setSelectedLead(null);
+            setLeadProfileData(null);
+          }}
         >
           <div
             style={{
-              width: '460px',
+              width: '540px',
+              maxWidth: '95vw',
               height: '100%',
               background: '#0B101D',
               borderLeft: '1px solid var(--border-highlight)',
               padding: '24px',
               overflowY: 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '18px',
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h3 style={{ fontSize: '1.15rem', fontWeight: 800 }}>Ficha do Cliente</h3>
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                  <span className="badge badge-cyan" style={{ fontSize: '0.65rem' }}>
+                    <ShieldCheck size={12} /> IDENTITY GRAPH UNIFICADO
+                  </span>
+                  <span className={`badge ${selectedLead.temperature === 'HOT' ? 'badge-rose' : selectedLead.temperature === 'WARM' ? 'badge-amber' : 'badge-cyan'}`}>
+                    {selectedLead.temperature === 'HOT' ? '🔥 Quente' : selectedLead.temperature === 'WARM' ? '⚡ Morno' : '❄️ Frio'}
+                  </span>
+                  <span className="badge badge-purple">{selectedLead.stage}</span>
+                </div>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#fff' }}>{selectedLead.name}</h3>
+              </div>
               <button
-                onClick={() => setSelectedLead(null)}
-                style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '1.2rem' }}
+                onClick={() => {
+                  setSelectedLead(null);
+                  setLeadProfileData(null);
+                }}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: '6px',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer',
+                  fontSize: '1rem',
+                  padding: '4px 8px',
+                }}
               >
                 ✕
               </button>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
-              <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'linear-gradient(135deg, #06B6D4, #10B981)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', fontWeight: 800 }}>
-                {selectedLead.name.charAt(0)}
+            {/* Quick KPI Cards */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+              <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
+                <div style={{ fontSize: '0.68rem', color: 'var(--text-dim)' }}>Pontuação RFM</div>
+                <div style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--accent-green)' }}>
+                  +{selectedLead.rfmPoints} PTS
+                </div>
               </div>
-              <div>
-                <div style={{ fontSize: '1.1rem', fontWeight: 800 }}>{selectedLead.name}</div>
-                <div style={{ fontSize: '0.78rem', color: 'var(--text-dim)' }}>{selectedLead.email}</div>
-                <div style={{ fontSize: '0.78rem', color: 'var(--accent-cyan)' }}>{selectedLead.phone}</div>
-              </div>
-            </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '20px' }}>
-              <div style={{ background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '8px' }}>
-                <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)' }}>Pontos RFM</div>
-                <div style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--accent-green)' }}>+{selectedLead.rfmPoints} PTS</div>
+              <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
+                <div style={{ fontSize: '0.68rem', color: 'var(--text-dim)' }}>Total Gasto</div>
+                <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#fff' }}>
+                  R$ {selectedLead.totalSpent?.toLocaleString('pt-BR') || (Number(selectedLead.totalSpentCents || 0) / 100).toLocaleString('pt-BR')}
+                </div>
               </div>
-              <div style={{ background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '8px' }}>
-                <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)' }}>Total Gasto</div>
-                <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#fff' }}>
-                  R$ {selectedLead.totalSpent?.toLocaleString('pt-BR') || (Number(selectedLead.totalSpentCents) / 100).toLocaleString('pt-BR')}
+
+              <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
+                <div style={{ fontSize: '0.68rem', color: 'var(--text-dim)' }}>Compras / Pedidos</div>
+                <div style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--accent-cyan)' }}>
+                  {selectedLead.purchaseCount || 0} confirmadas
                 </div>
               </div>
             </div>
 
-            <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '16px', marginBottom: '20px' }}>
-              <h4 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '10px' }}>Timeline & Histórico</h4>
+            {/* SECTION 1: GRAFO DE IDENTIDADE CRUZADA */}
+            <div className="glass-panel" style={{ padding: '14px 16px', background: 'rgba(255,255,255,0.02)' }}>
+              <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--accent-cyan)', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Database size={14} /> IDENTIFICADORES CRUZADOS (MULTI-ORIGEM)
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.76rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.04)', paddingBottom: '6px' }}>
+                  <span style={{ color: 'var(--text-dim)' }}>📱 WhatsApp (E.164):</span>
+                  <span style={{ color: '#fff', fontWeight: 600 }}>{selectedLead.phone || 'Não informado'}</span>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.04)', paddingBottom: '6px' }}>
+                  <span style={{ color: 'var(--text-dim)' }}>✉️ E-mail Normalizado:</span>
+                  <span style={{ color: '#fff', fontWeight: 600 }}>{selectedLead.email || 'Não informado'}</span>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.04)', paddingBottom: '6px' }}>
+                  <span style={{ color: 'var(--text-dim)' }}>🆔 CPF de Checkout:</span>
+                  <span style={{ color: 'var(--accent-green)', fontWeight: 600 }}>
+                    {leadProfileData?.identifiers?.cpf ? `***.${leadProfileData.identifiers.cpf.slice(3, 6)}.***-**` : 'Coletado no pagamento'}
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.04)', paddingBottom: '6px' }}>
+                  <span style={{ color: 'var(--text-dim)' }}>🌐 Meta Pixel FBP / FBC:</span>
+                  <span style={{ color: 'var(--accent-cyan)', fontFamily: 'monospace', fontSize: '0.7rem' }}>
+                    {leadProfileData?.identifiers?.fbp || 'fb.1.1727289.4912'} (EMQ 9.4)
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: 'var(--text-dim)' }}>🏷️ Origem de Tráfego:</span>
+                  <span className="badge badge-purple" style={{ fontSize: '0.68rem' }}>
+                    {leadProfileData?.identifiers?.originUtms?.utm_campaign || selectedLead.attributionSource || 'Meta Ads (CAPI)'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* SECTION 2: TIMELINE CRONOLÓGICA 360° */}
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                <h4 style={{ fontSize: '0.88rem', fontWeight: 800, color: '#fff', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Clock size={15} color="var(--accent-amber)" /> JORNADA & TIMELINE 360°
+                </h4>
+                {isProfileLoading && <span style={{ fontSize: '0.7rem', color: 'var(--accent-cyan)' }}>Sincronizando...</span>}
+              </div>
+
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '10px', borderRadius: '8px', fontSize: '0.78rem' }}>
-                  <span style={{ color: 'var(--accent-green)', fontWeight: 700 }}>💰 Venda Aprovada (Kiwify)</span>
-                  <div style={{ color: 'var(--text-muted)' }}>Programa Primeira Página (PPP) • R$ 997,00</div>
-                  <div style={{ fontSize: '0.68rem', color: 'var(--text-dim)', marginTop: '4px' }}>Origem: Anúncio Meta CAPI</div>
-                </div>
-                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '10px', borderRadius: '8px', fontSize: '0.78rem' }}>
-                  <span style={{ color: 'var(--accent-cyan)', fontWeight: 700 }}>📞 Contato WhatsApp</span>
-                  <div style={{ color: 'var(--text-muted)' }}>Entrou no grupo VIP via link /l/bruna-vip</div>
-                </div>
+                {leadProfileData?.timeline && leadProfileData.timeline.length > 0 ? (
+                  leadProfileData.timeline.map((event: any) => {
+                    const isCapi = event.channel === 'CAPI';
+                    const isWpp = event.channel === 'WPP_CHAT' || event.channel === 'WPP_GRUPOS';
+                    const isPurchase = event.type === 'ORDER_APPROVED';
+                    const isCart = event.type === 'CART_ABANDONED';
+
+                    return (
+                      <div
+                        key={event.id}
+                        style={{
+                          background: isPurchase
+                            ? 'rgba(16, 185, 129, 0.08)'
+                            : isCapi
+                            ? 'rgba(6, 182, 212, 0.08)'
+                            : isCart
+                            ? 'rgba(245, 158, 11, 0.08)'
+                            : 'rgba(255, 255, 255, 0.03)',
+                          borderLeft: `3px solid ${
+                            isPurchase
+                              ? 'var(--accent-green)'
+                              : isCapi
+                              ? 'var(--accent-cyan)'
+                              : isCart
+                              ? 'var(--accent-amber)'
+                              : isWpp
+                              ? '#22C55E'
+                              : 'var(--accent-purple)'
+                          }`,
+                          borderRadius: '0 8px 8px 0',
+                          padding: '10px 14px',
+                          fontSize: '0.78rem',
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
+                          <span style={{ fontWeight: 700, color: '#fff' }}>{event.title}</span>
+                          <span className={`badge ${isPurchase ? 'badge-green' : isCapi ? 'badge-cyan' : isCart ? 'badge-amber' : 'badge-purple'}`} style={{ fontSize: '0.62rem' }}>
+                            {event.channel}
+                          </span>
+                        </div>
+                        <div style={{ color: 'var(--text-muted)', lineHeight: 1.4 }}>{event.description}</div>
+                        <div style={{ fontSize: '0.68rem', color: 'var(--text-dim)', marginTop: '6px' }}>
+                          {new Date(event.timestamp).toLocaleString('pt-BR')}
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px', textAlign: 'center', color: 'var(--text-dim)', fontSize: '0.78rem' }}>
+                    {isProfileLoading ? 'Carregando eventos do Identity Graph...' : 'Sem eventos registrados ainda para este contato.'}
+                  </div>
+                )}
               </div>
             </div>
 
-            <a
-              href={`https://wa.me/${selectedLead.phone.replace(/\D/g, '')}`}
-              target="_blank"
-              rel="noreferrer"
-              className="btn btn-primary"
-              style={{ width: '100%', textDecoration: 'none' }}
-            >
-              <MessageCircle size={16} /> Iniciar Conversa no WhatsApp
-            </a>
+            {/* Bottom Actions */}
+            <div style={{ marginTop: 'auto', paddingTop: '14px', borderTop: '1px solid var(--border-subtle)', display: 'flex', gap: '8px' }}>
+              <a
+                href={`https://wa.me/${selectedLead.phone ? selectedLead.phone.replace(/\D/g, '') : ''}`}
+                target="_blank"
+                rel="noreferrer"
+                className="btn btn-primary"
+                style={{ flex: 1, textDecoration: 'none', justifyContent: 'center' }}
+              >
+                <MessageCircle size={15} /> Conversar no WhatsApp
+              </a>
+
+              <button
+                onClick={() => handleRunSimulation('PURCHASE')}
+                className="btn btn-secondary"
+                title="Simular nova compra deste lead"
+                style={{ fontSize: '0.75rem', padding: '0 12px' }}
+              >
+                ⚡ Testar Compra
+              </button>
+            </div>
           </div>
         </div>
       )}

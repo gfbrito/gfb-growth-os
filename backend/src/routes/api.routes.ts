@@ -5,6 +5,13 @@ import { listLaunches, listLaunchGroups, toggleGroupStatus, handleLaunchRedirect
 import { listInstances, connectInstance, listChats, sendChatMessage } from "../modules/whatsapp/whatsapp.controller.js";
 import { listLeads, listSales, listProducts, listRecovery, updateRecoveryStatus, importCsv } from "../modules/crm/crm.controller.js";
 import { listMediaJobs, createCaptionJob } from "../modules/media/media.controller.js";
+import {
+  handleKiwifyWebhook,
+  handleHotmartWebhook,
+  handleEduzzWebhook,
+  simulateWebhook,
+  getLeadTimeline,
+} from "../modules/webhooks/webhook.controller.js";
 
 const router = Router();
 
@@ -34,14 +41,22 @@ router.post("/api/whatsapp/chats/send", sendChatMessage);
 
 // CRM, Sales & Recovery Routes
 router.get("/api/crm/leads", listLeads);
+router.get("/api/crm/leads/:id/timeline", getLeadTimeline);
 router.get("/api/crm/sales", listSales);
 router.get("/api/crm/products", listProducts);
 router.get("/api/crm/recovery", listRecovery);
 router.patch("/api/crm/recovery/:id", updateRecoveryStatus);
 router.post("/api/crm/import-csv", importCsv);
 
+// Payment & Checkout Webhooks (Identity Graph & CAPI)
+router.post("/api/webhooks/kiwify", handleKiwifyWebhook);
+router.post("/api/webhooks/hotmart", handleHotmartWebhook);
+router.post("/api/webhooks/eduzz", handleEduzzWebhook);
+router.post("/api/webhooks/simulate", simulateWebhook);
+
 // Media & Video AI Routes
 router.get("/api/media/jobs", listMediaJobs);
 router.post("/api/media/caption", createCaptionJob);
 
 export const apiRoutes = router;
+
