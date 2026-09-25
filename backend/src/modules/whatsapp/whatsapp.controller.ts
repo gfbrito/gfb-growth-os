@@ -28,3 +28,37 @@ export async function connectInstance(req: Request, res: Response): Promise<void
     instructions: "Escaneie o código com seu WhatsApp para conectar a esteira anti-ban.",
   });
 }
+
+export async function listChats(req: Request, res: Response): Promise<void> {
+  res.json({
+    conversations: mockDb.chatConversations,
+    disconnectedAlert: {
+      hasDisconnected: true,
+      phone: "+556492180233",
+      message: "1 chip desconectado — resolver (+556492180233)",
+    },
+  });
+}
+
+export async function sendChatMessage(req: Request, res: Response): Promise<void> {
+  const { conversationId, text } = req.body;
+  const conv = mockDb.chatConversations.find((c) => c.id === conversationId);
+  if (!conv) {
+    res.status(404).json({ error: "Conversa não encontrada" });
+    return;
+  }
+
+  const newMsg = {
+    id: `msg_${Date.now()}`,
+    sender: "AGENT" as const,
+    text,
+    time: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+    status: "DELIVERED" as const,
+  };
+
+  conv.messages.push(newMsg);
+  conv.lastMessage = text;
+  conv.lastMessageTime = newMsg.time;
+
+  res.json({ success: true, message: newMsg });
+}

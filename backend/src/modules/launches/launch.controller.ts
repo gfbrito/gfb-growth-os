@@ -85,3 +85,28 @@ export async function handleLaunchRedirect(req: Request, res: Response): Promise
 export async function listLaunches(req: Request, res: Response): Promise<void> {
   res.json({ launches: mockDb.launches });
 }
+
+export async function listLaunchGroups(req: Request, res: Response): Promise<void> {
+  res.json({
+    groups: mockDb.launchGroups,
+    totalManagedGroups: mockDb.launchGroups.length,
+    activeRetainedLeads: 4258,
+    historicalTotalLeads: 4766,
+    retentionRatePct: 89.3,
+    totalClicks: 854,
+  });
+}
+
+export async function toggleGroupStatus(req: Request, res: Response): Promise<void> {
+  const { id } = req.params;
+  const { status } = req.body;
+  const grp = mockDb.launchGroups.find((g) => g.id === id);
+  if (!grp) {
+    res.status(404).json({ error: "Grupo não encontrado" });
+    return;
+  }
+  if (status) {
+    grp.status = status;
+  }
+  res.json({ success: true, group: grp });
+}

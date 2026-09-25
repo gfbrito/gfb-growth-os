@@ -94,6 +94,70 @@ export interface MockLaunch {
   conversionRatePct: number;
 }
 
+export interface MockProduct {
+  id: string;
+  clientId: string;
+  name: string;
+  type: "DIGITAL" | "PHYSICAL" | "SUBSCRIPTION";
+  priceCents: bigint;
+  status: "ACTIVE" | "INACTIVE";
+  salesCount: number;
+  isSubscription?: boolean;
+  renewalDays?: number;
+  renewalLink?: string;
+  externalPlatform?: string;
+}
+
+export interface MockRecoveryItem {
+  id: string;
+  clientId: string;
+  customerName: string;
+  customerPhone: string;
+  customerEmail: string;
+  productName: string;
+  amountCents: bigint;
+  type: "ABANDONED_CART" | "PAYMENT_REFUSED" | "PENDING_PIX_BOLETO" | "REFUND";
+  status: "PENDING" | "CONTACTED" | "RECOVERED" | "LOST";
+  platform: "KIWIFY" | "HOTMART" | "EDUZZ";
+  createdAt: string;
+}
+
+export interface MockChatMessage {
+  id: string;
+  sender: "CONTACT" | "AGENT" | "AI";
+  text: string;
+  time: string;
+  status: "SENT" | "DELIVERED" | "READ";
+}
+
+export interface MockChatConversation {
+  id: string;
+  clientId: string;
+  contactName: string;
+  contactPhone: string;
+  chipKey: string;
+  temperature: "HOT" | "WARM" | "COLD";
+  stage: string;
+  potentialCents: bigint;
+  unreadCount: number;
+  lastMessage: string;
+  lastMessageTime: string;
+  tags: string[];
+  notes: string;
+  messages: MockChatMessage[];
+}
+
+export interface MockLaunchGroupItem {
+  id: string;
+  launchId: string;
+  name: string;
+  number: number;
+  memberCount: number;
+  maxMembers: number;
+  status: "RECEIVING" | "PAUSED" | "FULL";
+  inviteUrl: string;
+}
+
 class MockDataStore {
   public organization = {
     id: "org_gfb_digital",
@@ -377,6 +441,319 @@ class MockDataStore {
       conversionRatePct: 22.4,
     },
   ];
+
+  public products: MockProduct[] = [
+    {
+      id: "prd_1",
+      clientId: "cli_bruna_ppp",
+      name: "Curso Online 10 pontos, 50 soluções",
+      type: "DIGITAL",
+      priceCents: BigInt(9700),
+      status: "ACTIVE",
+      salesCount: 1420,
+      externalPlatform: "KIWIFY",
+    },
+    {
+      id: "prd_2",
+      clientId: "cli_bruna_ppp",
+      name: "Curso Online Craniopuntura de Yamamoto",
+      type: "DIGITAL",
+      priceCents: BigInt(14700),
+      status: "ACTIVE",
+      salesCount: 890,
+      externalPlatform: "KIWIFY",
+    },
+    {
+      id: "prd_3",
+      clientId: "cli_bruna_ppp",
+      name: "Curso Online Moxaterapia",
+      type: "DIGITAL",
+      priceCents: BigInt(8700),
+      status: "ACTIVE",
+      salesCount: 650,
+      externalPlatform: "HOTMART",
+    },
+    {
+      id: "prd_4",
+      clientId: "cli_bruna_ppp",
+      name: "Método Diagnóstico 360°",
+      type: "DIGITAL",
+      priceCents: BigInt(49700),
+      status: "ACTIVE",
+      salesCount: 430,
+      externalPlatform: "KIWIFY",
+    },
+    {
+      id: "prd_5",
+      clientId: "cli_bruna_ppp",
+      name: "Renovação Acupunturista Master",
+      type: "SUBSCRIPTION",
+      priceCents: BigInt(99700),
+      status: "ACTIVE",
+      salesCount: 210,
+      isSubscription: true,
+      renewalDays: 365,
+      renewalLink: "https://pay.kiwify.com.br/renovacao-master",
+      externalPlatform: "KIWIFY",
+    },
+    {
+      id: "prd_6",
+      clientId: "cli_bruna_ppp",
+      name: "Programa Primeira Página (PPP)",
+      type: "DIGITAL",
+      priceCents: BigInt(99700),
+      status: "ACTIVE",
+      salesCount: 310,
+      externalPlatform: "KIWIFY",
+    },
+  ];
+
+  public recoveryItems: MockRecoveryItem[] = [
+    {
+      id: "rec_1",
+      clientId: "cli_bruna_ppp",
+      customerName: "Deuseli Q de Figueiredo Souza",
+      customerPhone: "+5561998765432",
+      customerEmail: "deuseli.souza@gmail.com",
+      productName: "Curso Online 10 pontos, 50 soluções",
+      amountCents: BigInt(9700),
+      type: "ABANDONED_CART",
+      status: "PENDING",
+      platform: "KIWIFY",
+      createdAt: "2026-09-25T10:15:00Z",
+    },
+    {
+      id: "rec_2",
+      clientId: "cli_bruna_ppp",
+      customerName: "PAULO RENATO DAS NEVES PEREIRA",
+      customerPhone: "+5511981234567",
+      customerEmail: "paulo.renato@uol.com.br",
+      productName: "Curso Online 10 pontos, 50 soluções",
+      amountCents: BigInt(8700),
+      type: "PENDING_PIX_BOLETO",
+      status: "CONTACTED",
+      platform: "KIWIFY",
+      createdAt: "2026-09-25T09:40:00Z",
+    },
+    {
+      id: "rec_3",
+      clientId: "cli_bruna_ppp",
+      customerName: "Fábio César Soares Hirata",
+      customerPhone: "+5519992345678",
+      customerEmail: "fabio.hirata@clinica.med.br",
+      productName: "Curso Online Craniopuntura de Yamamoto",
+      amountCents: BigInt(14700),
+      type: "PAYMENT_REFUSED",
+      status: "PENDING",
+      platform: "HOTMART",
+      createdAt: "2026-09-25T08:50:00Z",
+    },
+    {
+      id: "rec_4",
+      clientId: "cli_bruna_ppp",
+      customerName: "Carla Pombo",
+      customerPhone: "+5521976543210",
+      customerEmail: "carla.pombo@yahoo.com.br",
+      productName: "Método Diagnóstico 360°",
+      amountCents: BigInt(49700),
+      type: "ABANDONED_CART",
+      status: "RECOVERED",
+      platform: "KIWIFY",
+      createdAt: "2026-09-24T18:30:00Z",
+    },
+    {
+      id: "rec_5",
+      clientId: "cli_bruna_ppp",
+      customerName: "Maria das Graças Silva",
+      customerPhone: "+5531988887777",
+      customerEmail: "graca.silva@terra.com.br",
+      productName: "Curso Online Moxaterapia",
+      amountCents: BigInt(8700),
+      type: "REFUND",
+      status: "LOST",
+      platform: "HOTMART",
+      createdAt: "2026-09-23T14:20:00Z",
+    },
+  ];
+
+  public chatConversations: MockChatConversation[] = [
+    {
+      id: "chat_1",
+      clientId: "cli_bruna_ppp",
+      contactName: "Carla Pombo",
+      contactPhone: "+55 21 97654-3210",
+      chipKey: "aqc_bruna_01",
+      temperature: "HOT",
+      stage: "Fechamento",
+      potentialCents: BigInt(49700),
+      unreadCount: 1,
+      lastMessage: "Quero sim, por favor!",
+      lastMessageTime: "11:42",
+      tags: ["VIP", "Quente", "Kiwify"],
+      notes: "Interessada na mentoria com bônus de diagnóstico presencial.",
+      messages: [
+        {
+          id: "msg_1",
+          sender: "CONTACT",
+          text: "Olá! Vi a oferta do Método Diagnóstico 360°, vocês parcelam no cartão?",
+          time: "11:38",
+          status: "READ",
+        },
+        {
+          id: "msg_2",
+          sender: "AGENT",
+          text: "Olá Carla! Sim, parcelamos em até 12x sem juros pela Kiwify. Quer que eu te envie o link direto com o bônus garantido?",
+          time: "11:40",
+          status: "READ",
+        },
+        {
+          id: "msg_3",
+          sender: "CONTACT",
+          text: "Quero sim, por favor!",
+          time: "11:42",
+          status: "DELIVERED",
+        },
+      ],
+    },
+    {
+      id: "chat_2",
+      clientId: "cli_bruna_ppp",
+      contactName: "Camila Ribeiro",
+      contactPhone: "+55 11 98765-4321",
+      chipKey: "aqc_bruna_01",
+      temperature: "HOT",
+      stage: "Pós-Venda",
+      potentialCents: BigInt(99700),
+      unreadCount: 0,
+      lastMessage: "Parabéns Camila! Acabei de reenviar o link.",
+      lastMessageTime: "10:15",
+      tags: ["Aluno", "PPP"],
+      notes: "Aluna confirmada do programa de acupuntura.",
+      messages: [
+        {
+          id: "msg_4",
+          sender: "CONTACT",
+          text: "Acabei de fazer a inscrição no PPP! Onde pego o acesso às aulas?",
+          time: "10:12",
+          status: "READ",
+        },
+        {
+          id: "msg_5",
+          sender: "AGENT",
+          text: "Parabéns Camila! Acabei de reenviar o link de acesso no seu e-mail e ativei seu bônus no portal.",
+          time: "10:15",
+          status: "READ",
+        },
+      ],
+    },
+    {
+      id: "chat_3",
+      clientId: "cli_bruna_ppp",
+      contactName: "Rodrigo Silveira",
+      contactPhone: "+55 21 99887-7665",
+      chipKey: "aqc_bruna_01",
+      temperature: "HOT",
+      stage: "Mentoria VIP",
+      potentialCents: BigInt(149400),
+      unreadCount: 0,
+      lastMessage: "Confirmado para a aula de amanhã!",
+      lastMessageTime: "09:20",
+      tags: ["VIP", "Mentoria"],
+      notes: "Comprou PPP com order bump de mentoria individual.",
+      messages: [
+        {
+          id: "msg_6",
+          sender: "CONTACT",
+          text: "Nos vemos na mentoria ao vivo de sábado?",
+          time: "09:18",
+          status: "READ",
+        },
+        {
+          id: "msg_7",
+          sender: "AGENT",
+          text: "Confirmado para a aula de amanhã! Link será enviado no grupo VIP.",
+          time: "09:20",
+          status: "READ",
+        },
+      ],
+    },
+  ];
+
+  public launchGroups: MockLaunchGroupItem[] = Array.from({ length: 26 }, (_, i) => {
+    const num = i + 1;
+    const isFull = num <= 3;
+    const memberCount = isFull ? 1000 : Math.max(150, 984 - (num * 30));
+    return {
+      id: `grp_${num}`,
+      launchId: "lnc_1",
+      name: `Bruna Ortiz VIP — Turma Outubro #${String(num).padStart(2, "0")}`,
+      number: num,
+      memberCount,
+      maxMembers: 1024,
+      status: isFull ? "FULL" : "RECEIVING",
+      inviteUrl: `https://chat.whatsapp.com/invite_bruna_vip_${num}`,
+    };
+  });
+
+  public importCsvRows(rows: { name: string; email: string; phone?: string; product?: string; amount?: number; date?: string }[]) {
+    let importedLeads = 0;
+    let importedOrders = 0;
+
+    for (const r of rows) {
+      if (!r.email) continue;
+      const cleanEmail = r.email.toLowerCase().trim();
+      let lead = this.leads.find((l) => l.email === cleanEmail);
+
+      const amountVal = r.amount ? Math.round(r.amount * 100) : 9700;
+      let rfmAdd = 10;
+      if (amountVal > 99700) rfmAdd = 200;
+      else if (amountVal >= 49800) rfmAdd = 100;
+      else if (amountVal >= 29800) rfmAdd = 50;
+      else if (amountVal >= 9800) rfmAdd = 25;
+
+      if (!lead) {
+        lead = {
+          id: `lead_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          clientId: "cli_bruna_ppp",
+          name: r.name || "Cliente Importado",
+          email: cleanEmail,
+          phone: r.phone ? (r.phone.startsWith("+") ? r.phone : `+55${r.phone.replace(/\D/g, "")}`) : "+5511999999999",
+          temperature: "HOT",
+          stage: "BUYER",
+          rfmPoints: rfmAdd,
+          totalSpentCents: BigInt(amountVal),
+          purchaseCount: 1,
+          lastSeen: r.date || new Date().toISOString(),
+          attributionSource: "Importação CSV",
+        };
+        this.leads.unshift(lead);
+        importedLeads++;
+      } else {
+        lead.rfmPoints += rfmAdd;
+        lead.totalSpentCents += BigInt(amountVal);
+        lead.purchaseCount += 1;
+        lead.temperature = "HOT";
+      }
+
+      this.orders.unshift({
+        id: `ord_csv_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        clientId: "cli_bruna_ppp",
+        leadName: lead.name,
+        leadEmail: lead.email,
+        productName: r.product || "Curso Online 10 pontos, 50 soluções",
+        grossAmountCents: BigInt(amountVal),
+        status: "CONFIRMED",
+        platform: "KIWIFY",
+        isAttributedToAds: false,
+        adCampaignName: "Histórico Importado",
+        createdAt: r.date || new Date().toISOString(),
+        capiStatus: "SENT",
+      });
+      importedOrders++;
+    }
+
+    return { importedLeads, importedOrders, totalLeads: this.leads.length };
+  }
 }
 
 export const mockDb = new MockDataStore();
