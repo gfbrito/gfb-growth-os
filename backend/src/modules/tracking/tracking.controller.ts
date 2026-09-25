@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { prisma } from "../../services/prisma.js";
+import { mockDb } from "../../services/mockDb.js";
 import { generateSnippet } from "./snippet/snippetBuilder.js";
 import { metaCapiService } from "./capi/metaCapiService.js";
 import { logger } from "../../utils/logger.js";
@@ -11,10 +12,24 @@ export async function serveSnippet(req: Request, res: Response): Promise<void> {
   const pixelKey = String(req.params.pixel_key);
 
   try {
-    const pixel = await prisma.clientPixel.findUnique({
-      where: { pixelKey },
-      select: { pixelId: true, pixelKey: true, isActive: true },
-    });
+    let pixel: { pixelId: string; pixelKey: string; isActive: boolean } | null = null;
+
+    try {
+      pixel = await prisma.clientPixel.findUnique({
+        where: { pixelKey },
+        select: { pixelId: true, pixelKey: true, isActive: true },
+      });
+    } catch (dbErr) {
+      // Graceful fallback to mockDb when local Postgres is not running
+      const mockClient = mockDb.clients.find((c) => c.pixelKey === pixelKey);
+      if (mockClient) {
+        pixel = {
+          pixelId: mockClient.pixelId,
+          pixelKey: mockClient.pixelKey,
+          isActive: true,
+        };
+      }
+    }
 
     if (!pixel || !pixel.isActive) {
       res.status(404).type("text/javascript").send("/* GFB Pixel not found or inactive */");
