@@ -1,0 +1,609 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// -------------------------------------------------------------
+// 1. TENANCY & USERS
+// -------------------------------------------------------------
+
+enum UserRole {
+  SUPER_ADMIN
+  OWNER
+  ADMIN
+  GESTOR
+  COLLABORATOR
+  CLIENT
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  name         String
+  passwordHash String   @map("password_hash")
+  avatarUrl    String?  @map("avatar_url")
+  phone        String?
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  memberships    OrganizationMember[]
+  clientAccesses ClientMember[]
+  createdTasks   Task[]               @relation("TaskCreator")
+  assignedTasks  Task[]               @relation("TaskAssignee")
+  taskComments   TaskComment[]
+
+  @@map("users")
+}
+
+model Organization {
+  id          String   @id @default(uuid())
+  name        String
+  slug        String   @unique
+  logoUrl     String?  @map("logo_url")
+  plan        String   @default("ENTERPRISE")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  members     OrganizationMember[]
+  clients     Client[]
+  tasks       Task[]
+  instances   WhatsAppInstance[]
+
+  @@map("organizations")
+}
+
+model OrganizationMember {
+  id             String       @id @default(uuid())
+  organizationId String       @map("organization_id")
+  userId         String       @map("user_id")
+  role           UserRole     @default(GESTOR)
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@map("organization_members")
+}
+
+model Client {
+  id              String   @id @default(uuid())
+  organizationId  String   @map("organization_id")
+  name            String
+  slug            String
+  document        String?  // CNPJ / CPF masked
+  revenueGoalCents BigInt  @default(0) @map("revenue_goal_cents") // Meta mensal em centavos
+  isActive        Boolean  @default(true) @map("is_active")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  organization    Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  members         ClientMember[]
+  pixels          ClientPixel[]
+  adAccounts      MetaAdAccount[]
+  leads           Lead[]
+  orders          Order[]
+  products        Product[]
+  recoveries      Recovery[]
+  launches        Launch[]
+  tasks           Task[]
+  mediaJobs       MediaJob[]
+  speakers        Speaker[]
+
+  @@unique([organizationId, slug])
+  @@map("clients")
+}
+
+model ClientMember {
+  id              String   @id @default(uuid())
+  clientId        String   @map("client_id")
+  userId          String   @map("user_id")
+  isPrimaryGestor Boolean  @default(false) @map("is_primary_gestor")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  client          Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, userId])
+  @@map("client_members")
+}
+
+// -------------------------------------------------------------
+// 2. TRACKING & CAPI GATEWAY
+// -------------------------------------------------------------
+
+model ClientPixel {
+  id          String   @id @default(uuid())
+  clientId    String   @map("client_id")
+  pixelId     String   @map("pixel_id")
+  pixelKey    String   @unique @map("pixel_key") // Chave usada no snippet /s/:pixel_key.js
+  capiToken   String   @map("capi_token")       // Access Token Meta Graph API
+  testCode    String?  @map("test_code")        // TESTxxxxx para validar no Events Manager
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  events      EventRaw[]
+
+  @@map("client_pixels")
+}
+
+model MetaAdAccount {
+  id              String   @id @default(uuid())
+  clientId        String   @map("client_id")
+  adAccountId     String   @map("ad_account_id") // act_xxxxxxxxx
+  name            String
+  accessTokenEnc  String   @map("access_token_enc")
+  currency        String   @default("BRL")
+  isActive        Boolean  @default(true) @map("is_active")
+  lastSyncAt      DateTime? @map("last_sync_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  client          Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@map("meta_ad_accounts")
+}
+
+model EventRaw {
+  id            String      @id @default(uuid())
+  pixelKey      String      @map("pixel_key")
+  eventName     String      @map("event_name")     // PageView, ViewContent, InitiateCheckout, Lead, Purchase
+  eventId       String      @map("event_id")       // Deduplication key
+  eventSource   String      @default("website")    // website, server, system
+  url           String?
+  referrer      String?
+  fbp           String?
+  fbc           String?
+  capiUid       String?     @map("capi_uid")
+  externalId    String?     @map("external_id")
+  ipAddress     String?     @map("ip_address")
+  userAgent     String?     @map("user_agent")
+  customData    Json?       @map("custom_data")
+  userData      Json?       @map("user_data")
+  capiStatus    String      @default("PENDING")    // PENDING, SENT, FAILED, DISCARDED
+  capiResponse  Json?       @map("capi_response")
+  fbTraceId     String?     @map("fb_trace_id")
+  matchScore    Int?        @map("match_score")
+  createdAt     DateTime    @default(now()) @map("created_at")
+
+  pixel         ClientPixel @relation(fields: [pixelKey], references: [pixelKey], onDelete: Cascade)
+
+  @@index([eventId, eventName, pixelKey])
+  @@index([capiStatus, createdAt])
+  @@map("events_raw")
+}
+
+model CheckoutIntent {
+  id            String   @id @default(uuid())
+  capiIdx       String   @unique @map("capi_idx") // cidx_...
+  pixelKey      String   @map("pixel_key")
+  fbp           String?
+  fbc           String?
+  externalId    String?  @map("external_id")
+  ipAddress     String?  @map("ip_address")
+  userAgent     String?  @map("user_agent")
+  landingUrl    String?  @map("landing_url")
+  checkoutUrl   String?  @map("checkout_url")
+  leadPhone     String?  @map("lead_phone")
+  leadEmail     String?  @map("lead_email")
+  isConverted   Boolean  @default(false) @map("is_converted")
+  createdAt     DateTime @default(now()) @map("created_at")
+  expiresAt     DateTime @map("expires_at")
+
+  @@index([capiIdx])
+  @@index([fbc])
+  @@map("checkout_intents")
+}
+
+// -------------------------------------------------------------
+// 3. CRM & SALES INTELLIGENCE
+// -------------------------------------------------------------
+
+enum LeadTemperature {
+  HOT
+  WARM
+  COLD
+  INACTIVE
+}
+
+enum LeadStage {
+  LEAD
+  BUYER
+  RECURRING
+  VIP
+}
+
+model Lead {
+  id              String          @id @default(uuid())
+  clientId        String          @map("client_id")
+  name            String?
+  email           String?
+  emailHash       String?         @map("email_hash") // SHA256 para Meta Matching
+  phoneE164       String?         @map("phone_e164")  // +5511999999999
+  phoneHash       String?         @map("phone_hash") // SHA256 para Meta Matching
+  cpfMasked       String?         @map("cpf_masked")
+  temperature     LeadTemperature @default(HOT)
+  stage           LeadStage       @default(LEAD)
+  rfmPoints       Int             @default(0) @map("rfm_points")
+  totalSpentCents BigInt          @default(0) @map("total_spent_cents")
+  purchaseCount   Int             @default(0) @map("purchase_count")
+  tags            String[]        @default([])
+  firstSeenAt     DateTime        @default(now()) @map("first_seen_at")
+  lastSeenAt      DateTime        @default(now()) @map("last_seen_at")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  client          Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  identities      LeadIdentity[]
+  orders          Order[]
+  recoveries      Recovery[]
+  launchClicks    LaunchClick[]
+
+  @@unique([clientId, email])
+  @@unique([clientId, phoneE164])
+  @@index([clientId, temperature])
+  @@index([clientId, stage])
+  @@map("leads")
+}
+
+model LeadIdentity {
+  id         String   @id @default(uuid())
+  leadId     String   @map("lead_id")
+  capiUid    String?  @map("capi_uid")
+  fbp        String?
+  fbc        String?
+  ipAddress  String?  @map("ip_address")
+  userAgent  String?  @map("user_agent")
+  source     String   @default("WEBSITE") // WEBSITE, WHATSAPP, CHECKOUT
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  lead       Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@index([fbc])
+  @@map("lead_identities")
+}
+
+model Product {
+  id          String   @id @default(uuid())
+  clientId    String   @map("client_id")
+  name        String
+  externalId  String?  @map("external_id") // ID na Kiwify / Hotmart
+  platform    String   @default("KIWIFY")  // KIWIFY, HOTMART, EDUZZ, ASAAS
+  priceCents  BigInt   @default(0) @map("price_cents")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  orders      Order[]
+
+  @@unique([clientId, externalId, platform])
+  @@map("products")
+}
+
+enum OrderStatus {
+  CONFIRMED
+  PENDING
+  REFUNDED
+  CHARGEBACK
+  CANCELED
+}
+
+model Order {
+  id                String      @id @default(uuid())
+  clientId          String      @map("client_id")
+  leadId            String      @map("lead_id")
+  productId         String?     @map("product_id")
+  platform          String      // KIWIFY, HOTMART, EDUZZ, ASAAS
+  platformOrderId   String      @map("platform_order_id")
+  status            OrderStatus @default(CONFIRMED)
+  grossAmountCents  BigInt      @map("gross_amount_cents")
+  netAmountCents    BigInt      @map("net_amount_cents")
+  currency          String      @default("BRL")
+  paymentMethod     String?     @map("payment_method") // pix, credit_card, boleto
+  capiIdxMatched    String?     @map("capi_idx_matched")
+  isAttributedToAds Boolean     @default(false) @map("is_attributed_to_ads")
+  adCampaignId      String?     @map("ad_campaign_id")
+  adId              String?     @map("ad_id")
+  capiStatus        String      @default("PENDING") // PENDING, SENT, FAILED
+  capiFbTraceId     String?     @map("capi_fb_trace_id")
+  createdAt         DateTime    @default(now()) @map("created_at")
+
+  client            Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  lead              Lead        @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  product           Product?    @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@unique([clientId, platform, platformOrderId])
+  @@index([clientId, status, createdAt])
+  @@map("orders")
+}
+
+enum RecoveryType {
+  CART_ABANDONED
+  PIX_PENDING
+  BOLETO_PENDING
+  CARD_REFUSED
+}
+
+enum RecoveryStatus {
+  PENDING
+  IN_PROGRESS
+  RECOVERED_BY_SALE
+  LOST
+}
+
+model Recovery {
+  id          String         @id @default(uuid())
+  clientId    String         @map("client_id")
+  leadId      String         @map("lead_id")
+  type        RecoveryType
+  status      RecoveryStatus @default(PENDING)
+  checkoutUrl String?        @map("checkout_url")
+  pixCode     String?        @map("pix_code")
+  amountCents BigInt         @default(0) @map("amount_cents")
+  notes       String?
+  createdAt   DateTime       @default(now()) @map("created_at")
+  resolvedAt  DateTime?      @map("resolved_at")
+
+  client      Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  lead        Lead           @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([clientId, status])
+  @@map("recoveries")
+}
+
+// -------------------------------------------------------------
+// 4. WHATSAPP, AQUECEDOR & SENDGATE
+// -------------------------------------------------------------
+
+enum WhatsAppInstanceStatus {
+  DISCONNECTED
+  CONNECTING
+  QR_READY
+  CONNECTED
+  QUARANTINED
+}
+
+model WhatsAppInstance {
+  id              String                 @id @default(uuid())
+  organizationId  String                 @map("organization_id")
+  name            String
+  instanceKey     String                 @unique @map("instance_key") // aqc_xxx ou gfb_xxx
+  provider        String                 @default("EVOLUTION_V2")
+  phoneE164       String?                @map("phone_e164")
+  status          WhatsAppInstanceStatus @default(DISCONNECTED)
+  qrCodeBase64    String?                @map("qr_code_base64")
+  warmingEnabled  Boolean                @default(false) @map("warming_enabled")
+  warmingScore    Int                    @default(0) @map("warming_score") // 0-100
+  banRiskScore    Int                    @default(0) @map("ban_risk_score") // 0-100
+  dailySendCap    Int                    @default(50) @map("daily_send_cap")
+  sentTodayCount  Int                    @default(0) @map("sent_today_count")
+  lastActivityAt  DateTime?              @map("last_activity_at")
+  createdAt       DateTime               @default(now()) @map("created_at")
+
+  organization    Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  warmingLogs     WarmingLog[]
+
+  @@map("whatsapp_instances")
+}
+
+model WarmingLog {
+  id            String           @id @default(uuid())
+  instanceId    String           @map("instance_id")
+  targetPhone   String           @map("target_phone")
+  messageType   String           @default("TEXT") // TEXT, IMAGE, AUDIO
+  content       String
+  isCrossTenant Boolean          @default(false) @map("is_cross_tenant")
+  status        String           @default("SENT") // SENT, REPLIED, FAILED
+  sentAt        DateTime         @default(now()) @map("sent_at")
+
+  instance      WhatsAppInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  @@index([instanceId, sentAt])
+  @@map("warming_logs")
+}
+
+// -------------------------------------------------------------
+// 5. LANÇAMENTOS & COMUNIDADES (SENDFLOW)
+// -------------------------------------------------------------
+
+model Launch {
+  id              String        @id @default(uuid())
+  clientId        String        @map("client_id")
+  name            String
+  slug            String        @unique // Usado em /l/:slug
+  maxMembersGroup Int           @default(1000) @map("max_members_group")
+  fullGroupMessage String?      @map("full_group_message")
+  isActive        Boolean       @default(true) @map("is_active")
+  createdAt       DateTime      @default(now()) @map("created_at")
+
+  client          Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  groups          LaunchGroup[]
+  clicks          LaunchClick[]
+
+  @@map("launches")
+}
+
+model LaunchGroup {
+  id            String   @id @default(uuid())
+  launchId      String   @map("launch_id")
+  groupName     String   @map("group_name")
+  inviteUrl     String   @map("invite_url")
+  whatsappJid   String?  @map("whatsapp_jid") // JID no WhatsApp
+  currentMembers Int     @default(0) @map("current_members")
+  isAccepting   Boolean  @default(true) @map("is_accepting")
+  displayOrder  Int      @default(1) @map("display_order")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  launch        Launch   @relation(fields: [launchId], references: [id], onDelete: Cascade)
+
+  @@map("launch_groups")
+}
+
+model LaunchClick {
+  id          String   @id @default(uuid())
+  launchId    String   @map("launch_id")
+  leadId      String?  @map("lead_id")
+  ipAddress   String?  @map("ip_address")
+  userAgent   String?  @map("user_agent")
+  utmSource   String?  @map("utm_source")
+  utmMedium   String?  @map("utm_medium")
+  utmCampaign String?  @map("utm_campaign")
+  utmContent  String?  @map("utm_content")
+  utmTerm     String?  @map("utm_term")
+  isConverted Boolean  @default(false) @map("is_converted")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  launch      Launch   @relation(fields: [launchId], references: [id], onDelete: Cascade)
+  lead        Lead?    @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  @@map("launch_clicks")
+}
+
+// -------------------------------------------------------------
+// 6. WORKSPACE DA AGÊNCIA (CLICKUP STYLE)
+// -------------------------------------------------------------
+
+enum TaskStatus {
+  BACKLOG
+  TODO
+  IN_PROGRESS
+  REVIEW
+  DONE
+}
+
+enum TaskPriority {
+  URGENT
+  HIGH
+  NORMAL
+  LOW
+}
+
+model Task {
+  id                  String         @id @default(uuid())
+  organizationId      String         @map("organization_id")
+  clientId            String?        @map("client_id")
+  creatorUserId       String         @map("creator_user_id")
+  assignedUserId      String?        @map("assigned_user_id")
+  title               String
+  descriptionMarkdown String?        @map("description_markdown")
+  status              TaskStatus     @default(TODO)
+  priority            TaskPriority   @default(NORMAL)
+  dueDate             DateTime?      @map("due_date")
+  timeEstimateMinutes Int?           @map("time_estimate_minutes")
+  timeSpentMinutes    Int            @default(0) @map("time_spent_minutes")
+  labels              String[]       @default([])
+  createdAt           DateTime       @default(now()) @map("created_at")
+  updatedAt           DateTime       @updatedAt @map("updated_at")
+
+  organization        Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client              Client?        @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  creator             User           @relation("TaskCreator", fields: [creatorUserId], references: [id], onDelete: Cascade)
+  assignee            User?          @relation("TaskAssignee", fields: [assignedUserId], references: [id], onDelete: SetNull)
+  checklists          TaskChecklist[]
+  comments            TaskComment[]
+
+  @@index([organizationId, status])
+  @@index([clientId, status])
+  @@index([assignedUserId, status])
+  @@map("tasks")
+}
+
+model TaskChecklist {
+  id          String   @id @default(uuid())
+  taskId      String   @map("task_id")
+  title       String
+  isCompleted Boolean  @default(false) @map("is_completed")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@map("task_checklists")
+}
+
+model TaskComment {
+  id          String   @id @default(uuid())
+  taskId      String   @map("task_id")
+  userId      String   @map("user_id")
+  comment     String
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("task_comments")
+}
+
+// -------------------------------------------------------------
+// 7. SUÍTE DE MÍDIA, LEGENDA & DIARIZAÇÃO
+// -------------------------------------------------------------
+
+enum MediaJobType {
+  CAPTION_REEL_916
+  AUDIO_EVENT_DIARIZATION
+  VIDEO_CLIP_EXTRACT
+}
+
+enum MediaJobStatus {
+  QUEUED
+  PREPROCESSING
+  TRANSCRIBING
+  DIARIZING
+  RENDERING
+  COMPLETED
+  FAILED
+}
+
+model MediaJob {
+  id             String         @id @default(uuid())
+  clientId       String         @map("client_id")
+  type           MediaJobType
+  status         MediaJobStatus @default(QUEUED)
+  progress       Int            @default(0) // 0-100%
+  inputFilePath  String         @map("input_file_path")
+  outputFilePath String?        @map("output_file_path")
+  outputJson     Json?          @map("output_json") // Transcript detalhado com speakers e timestamps
+  errorMessage   String?        @map("error_message")
+  durationSeconds Float?        @map("duration_seconds")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  completedAt    DateTime?      @map("completed_at")
+
+  client         Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId, status])
+  @@map("media_jobs")
+}
+
+model Speaker {
+  id             String          @id @default(uuid())
+  clientId       String          @map("client_id")
+  name           String
+  avatarUrl      String?         @map("avatar_url")
+  voiceEmbedding Float[]         @map("voice_embedding") // Vetor médio representativo
+  sampleCount    Int             @default(0) @map("sample_count")
+  createdAt      DateTime        @default(now()) @map("created_at")
+
+  client         Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  samples        SpeakerSample[]
+
+  @@map("speakers")
+}
+
+model SpeakerSample {
+  id             String   @id @default(uuid())
+  speakerId      String   @map("speaker_id")
+  filePath       String   @map("file_path")
+  durationSeconds Float   @map("duration_seconds")
+  sampleEmbedding Float[] @map("sample_embedding")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  speaker        Speaker  @relation(fields: [speakerId], references: [id], onDelete: Cascade)
+
+  @@map("speaker_samples")
+}

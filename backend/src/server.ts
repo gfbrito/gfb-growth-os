@@ -1,0 +1,150 @@
+import express, { Request, Response, NextFunction } from "express";
+import http from "node:http";
+import cors from "cors";
+import helmet from "helmet";
+import cookieParser from "cookie-parser";
+import { Server as SocketIOServer } from "socket.io";
+import { env } from "./config/env.js";
+import { logger } from "./utils/logger.js";
+import { prisma } from "./services/prisma.js";
+import { authRoutes } from "./modules/auth/auth.routes.js";
+
+const app = express();
+const server = http.createServer(app);
+
+// Realtime Socket.IO configuration
+export const io = new SocketIOServer(server, {
+  cors: {
+    origin: [env.FRONTEND_URL, "http://localhost:3000"],
+    credentials: true,
+  },
+});
+
+io.on("connection", (socket) => {
+  logger.info({ socketId: socket.id }, "Client connected to realtime socket");
+
+  socket.on("join:client", (clientId: string) => {
+    socket.join(`client:${clientId}`);
+    logger.debug({ socketId: socket.id, clientId }, "Socket joined client room");
+  });
+
+  socket.on("join:org", (orgId: string) => {
+    socket.join(`org:${orgId}`);
+    logger.debug({ socketId: socket.id, orgId }, "Socket joined org room");
+  });
+
+  socket.on("disconnect", () => {
+    logger.info({ socketId: socket.id }, "Client disconnected from socket");
+  });
+});
+
+// Middleware stack
+app.use(
+  helmet({
+    contentSecurityPolicy: false, // Customized in production or per-route
+  })
+);
+
+app.use(
+  cors({
+    origin: [env.FRONTEND_URL, "http://localhost:3000"],
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+  })
+);
+
+app.use(cookieParser(env.COOKIE_SECRET));
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
+// Request logging
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on("finish", () => {
+    const duration = Date.now() - start;
+    if (req.path !== "/health") {
+      logger.info(
+        {
+          method: req.method,
+          path: req.path,
+          status: res.statusCode,
+          durationMs: duration,
+        },
+        "HTTP Request"
+      );
+    }
+  });
+  next();
+});
+
+// Health check endpoint
+app.get("/health", async (_req: Request, res: Response) => {
+  try {
+    const dbStart = Date.now();
+    await prisma.$queryRaw`SELECT 1`;
+    const dbLatency = Date.now() - dbStart;
+
+    res.json({
+      status: "healthy",
+      service: "gfb-growth-os-backend",
+      version: "1.0.0",
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString(),
+      database: {
+        status: "connected",
+        latencyMs: dbLatency,
+      },
+      memory: {
+        rssMb: Math.round(process.memoryUsage().rss / 1024 / 1024),
+        heapUsedMb: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+      },
+    });
+  } catch (err: any) {
+    res.status(503).json({
+      status: "degraded",
+      database: {
+        status: "disconnected",
+        error: err.message,
+      },
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
+// API Routes
+app.use("/api/auth", authRoutes);
+
+// Global Error Handler
+app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
+  logger.error(
+    {
+      err: err.message,
+      stack: env.NODE_ENV === "development" ? err.stack : undefined,
+      path: req.path,
+      method: req.method,
+    },
+    "Unhandled Exception"
+  );
+
+  res.status(err.status || 500).json({
+    error: env.NODE_ENV === "production" ? "Internal server error" : err.message,
+    code: err.code || "INTERNAL_SERVER_ERROR",
+  });
+});
+
+// Server boot
+const PORT = env.PORT || 3001;
+server.listen(PORT, () => {
+  logger.info(`🚀 GFB Growth OS Backend running on port ${PORT} [${env.NODE_ENV}]`);
+});
+
+// Graceful shutdown
+process.on("SIGTERM", async () => {
+  logger.info("SIGTERM received. Shutting down gracefully...");
+  await prisma.$disconnect();
+  server.close(() => {
+    logger.info("Server closed.");
+    process.exit(0);
+  });
+});
