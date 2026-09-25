@@ -279,6 +279,17 @@ export function ClientMedia() {
               </button>
             </div>
 
+            {/* Speaker Registry Pills */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>Oradores Registrados (PyAnnote Voiceprints):</span>
+              <span className="badge badge-green" style={{ fontSize: '0.68rem' }}>🎙️ Gisley Fernandes (98%)</span>
+              <span className="badge badge-purple" style={{ fontSize: '0.68rem' }}>🎙️ Bruna Ortiz (96%)</span>
+              <span className="badge badge-cyan" style={{ fontSize: '0.68rem' }}>🎙️ Arthur Gestor (94%)</span>
+              <span className="badge" style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#EF4444', fontSize: '0.68rem' }}>
+                🛡️ Rejeição de Ruído Ativa
+              </span>
+            </div>
+
             {/* Transcript Viewer */}
             <div
               style={{
@@ -294,17 +305,17 @@ export function ClientMedia() {
               }}
             >
               <div style={{ color: 'var(--accent-green)', fontWeight: 700 }}>
-                [00:12:31] Gisley Fernandes (Confiança: 94%):
+                [00:12:31] Gisley Fernandes (Confiança: 98%):
               </div>
               <div style={{ color: '#fff', marginBottom: '12px' }}>
-                "Agora vamos começar a próxima parte do encontro de escala de tráfego e esteiras anti-ban."
+                "Iniciando a sessão de alinhamento estratégico do lançamento. Nossa esteira do CAPI está com 9.4 de pontuação."
               </div>
 
-              <div style={{ color: 'var(--accent-cyan)', fontWeight: 700 }}>
-                [00:12:44] Bruna Ortiz (Confiança: 91%):
+              <div style={{ color: 'var(--accent-purple)', fontWeight: 700 }}>
+                [00:12:44] Bruna Ortiz (Confiança: 96%):
               </div>
               <div style={{ color: '#fff', marginBottom: '12px' }}>
-                "Antes disso, eu queria fazer uma observação sobre a nossa oferta dos 10 pontos e a transição para a turma VIP."
+                "Excelente. Os grupos do WhatsApp já estão recebendo leads pelo link /l/bruna-vip sem nenhum travamento."
               </div>
 
               <div style={{ color: 'var(--accent-amber)', fontWeight: 700 }}>
@@ -315,7 +326,7 @@ export function ClientMedia() {
               </div>
 
               <div style={{ color: 'var(--accent-green)', fontWeight: 700 }}>
-                [00:13:22] Gisley Fernandes (Confiança: 96%):
+                [00:13:22] Gisley Fernandes (Confiança: 98%):
               </div>
               <div style={{ color: '#fff' }}>
                 "Exatamente por causa do parâmetro s2 anexado à Kiwify. Mesmo que o comprador abra em nova aba, o capi_idx permanece amarrado."
@@ -323,12 +334,29 @@ export function ClientMedia() {
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '16px' }}>
-              <button className="btn btn-secondary" style={{ fontSize: '0.8rem' }}>
-                Copiar Ata Completa
+              <button
+                className="btn btn-secondary"
+                style={{ fontSize: '0.8rem' }}
+                onClick={() => {
+                  fetch('/api/media/jobs/job_diarization_02/export')
+                    .then((r) => r.text())
+                    .then((text) => {
+                      navigator.clipboard.writeText(text);
+                      alert('Ata estruturada copiada para a área de transferência!');
+                    });
+                }}
+              >
+                Copiar Ata Completa (Markdown)
               </button>
-              <button className="btn btn-primary" style={{ fontSize: '0.8rem' }}>
-                Exportar para n8n / Claude / GPT
-              </button>
+              <a
+                href="/api/media/jobs/job_diarization_02/export"
+                target="_blank"
+                download="ata_mesa_de_som.md"
+                className="btn btn-primary"
+                style={{ fontSize: '0.8rem', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}
+              >
+                <Download size={14} /> Exportar Ata para n8n / Claude / GPT
+              </a>
             </div>
           </div>
         </div>

@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import { mediaEngineService } from "../../services/mediaEngineService.js";
 
 export interface MockMediaJob {
   id: string;
@@ -83,7 +84,36 @@ export async function createCaptionJob(req: Request, res: Response): Promise<voi
     newJob.status = "COMPLETED";
     newJob.progress = 100;
     newJob.outputVideoUrl = "https://capi.gfbdigital.com.br/sample_ready.mp4";
-  }, 5000);
+  }, 4000);
 
   res.status(202).json({ job: newJob });
 }
+
+export async function listSpeakers(req: Request, res: Response): Promise<void> {
+  res.json({ speakers: mediaEngineService.listSpeakers() });
+}
+
+export async function addSpeaker(req: Request, res: Response): Promise<void> {
+  const { name, role } = req.body;
+  if (!name) {
+    res.status(400).json({ error: "Nome do orador é obrigatório" });
+    return;
+  }
+  const speaker = mediaEngineService.registerSpeaker(name, role || "SPEAKER");
+  res.status(201).json({ success: true, speaker });
+}
+
+export async function exportJobMarkdown(req: Request, res: Response): Promise<void> {
+  const id = String(req.params.id);
+  const job = mockMediaJobs.find((j) => j.id === id);
+
+  const diarization = mediaEngineService.diarizeLongAudio({
+    audioTitle: job?.title || "Gravação Mesa de Som.wav",
+    durationSeconds: job?.durationSeconds || 7200,
+  });
+
+  res.setHeader("Content-Type", "text/markdown; charset=utf-8");
+  res.setHeader("Content-Disposition", `attachment; filename="ata_${id}.md"`);
+  res.send(diarization.markdownExport);
+}
+

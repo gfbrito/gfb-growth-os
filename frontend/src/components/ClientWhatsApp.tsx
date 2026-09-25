@@ -35,6 +35,28 @@ export function ClientWhatsApp() {
   const [chatSearch, setChatSearch] = useState('');
   const [chatFilter, setChatFilter] = useState<'ALL' | 'UNREAD'>('ALL');
 
+  // SendGate Spintax & Pacing Tester state
+  const [spintaxInput, setSpintaxInput] = useState('{Olá|Oi|Tudo bem}, {nome}! Seu {acesso exclusivo|desconto especial} foi {liberado|ativado}.');
+  const [spintaxResult, setSpintaxResult] = useState<any>(null);
+  const [isTestingSpintax, setIsTestingSpintax] = useState(false);
+
+  const handleTestSpintax = () => {
+    setIsTestingSpintax(true);
+    fetch('/api/whatsapp/sendgate/preview', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text: spintaxInput,
+        leadName: 'Bruna',
+        instanceKey: 'aqc_bruna_01',
+      }),
+    })
+      .then((res) => res.json())
+      .then((data) => setSpintaxResult(data))
+      .catch((err) => console.error(err))
+      .finally(() => setIsTestingSpintax(false));
+  };
+
   // Instances state
   const [instances, setInstances] = useState<any[]>([]);
   const [showQrModal, setShowQrModal] = useState(false);
@@ -545,6 +567,87 @@ export function ClientWhatsApp() {
             </div>
           </div>
 
+          {/* SendGate Interactive Spintax & Gaussian Pacing Simulator */}
+          <div className="glass-panel" style={{ padding: '24px', border: '1px solid rgba(6, 182, 212, 0.3)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Sparkles size={18} color="var(--accent-cyan)" />
+                <h4 style={{ fontSize: '1.05rem', fontWeight: 800 }}>Simulador de Spintax & Pacing Anti-Ban</h4>
+              </div>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <span className="badge badge-green">🟢 Horário Comercial: 08h-21h</span>
+                <span className="badge badge-cyan">Gaussiano: 15s-45s</span>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '14px' }}>
+              <label style={{ fontSize: '0.78rem', color: 'var(--text-dim)' }}>
+                Template com Spintax aninhado e variáveis:
+              </label>
+              <textarea
+                value={spintaxInput}
+                onChange={(e) => setSpintaxInput(e.target.value)}
+                rows={2}
+                style={{
+                  width: '100%',
+                  background: 'rgba(255, 255, 255, 0.04)',
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: '8px',
+                  padding: '10px 12px',
+                  color: '#fff',
+                  fontSize: '0.82rem',
+                  fontFamily: 'monospace',
+                }}
+              />
+              <button
+                onClick={handleTestSpintax}
+                disabled={isTestingSpintax}
+                className="btn btn-primary"
+                style={{ alignSelf: 'flex-start', fontSize: '0.78rem', padding: '6px 14px' }}
+              >
+                {isTestingSpintax ? 'Calculando...' : '⚡ Testar Pacing & Variação'}
+              </button>
+            </div>
+
+            {spintaxResult && (
+              <div
+                style={{
+                  background: 'rgba(255, 255, 255, 0.02)',
+                  border: '1px solid rgba(6, 182, 212, 0.25)',
+                  borderRadius: '8px',
+                  padding: '14px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px',
+                  fontSize: '0.78rem',
+                }}
+              >
+                <div>
+                  <span style={{ color: 'var(--text-dim)' }}>Variação Resolvida (Humanizada):</span>
+                  <div style={{ color: 'var(--accent-green)', fontWeight: 700, marginTop: '2px', fontSize: '0.85rem' }}>
+                    "{spintaxResult.parsedMessage}"
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px', marginTop: '6px' }}>
+                  <div style={{ background: 'rgba(255,255,255,0.03)', padding: '8px 10px', borderRadius: '6px' }}>
+                    <div style={{ fontSize: '0.68rem', color: 'var(--text-dim)' }}>Jitter Gaussiano</div>
+                    <div style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--accent-cyan)' }}>
+                      {spintaxResult.gaussianDelaySeconds} segundos
+                    </div>
+                  </div>
+
+                  <div style={{ background: 'rgba(255,255,255,0.03)', padding: '8px 10px', borderRadius: '6px' }}>
+                    <div style={{ fontSize: '0.68rem', color: 'var(--text-dim)' }}>Diagnóstico Anti-Ban</div>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#fff' }}>
+                      {spintaxResult.diagnostic}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* SendGate Engine Description Box */}
           <div className="glass-panel" style={{ padding: '24px' }}>
             <h4 style={{ fontSize: '1.1rem', fontWeight: 800, marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -552,7 +655,7 @@ export function ClientWhatsApp() {
               O Que Torna o Motor SendGate Anti-Ban Único?
             </h4>
             <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.6 }}>
-              Diferente de disparadores comuns que disparam de forma linear, o SendGate usa **jitter gaussiano (1.5s a 3.5s)**, pausas programadas (*coffee breaks* de 20 a 40 segundos a cada 25 mensagens) e uma rede **cross-tenant peer-to-peer**. Se o score de risco atingir 70%, o sistema entra em quarentena preventiva instantaneamente para nunca perder a esteira de atendimento.
+              Diferente de disparadores comuns que disparam de forma linear, o SendGate usa **jitter gaussiano (15s a 45s)**, pausas programadas (*coffee breaks* de 10 a 15 minutos a cada 25 mensagens) e uma esteira com proteção rigorosa de horário comercial (**08h às 21h**). Se o chip desconectar, o envio é suspenso imediatamente para não queimar a reputação do número.
             </p>
           </div>
         </div>

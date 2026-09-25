@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { mockDb } from "../../services/mockDb.js";
+import { launchRouterService } from "../../services/launchRouterService.js";
 import { logger } from "../../utils/logger.js";
 
 /**
@@ -10,29 +11,41 @@ export async function handleLaunchRedirect(req: Request, res: Response): Promise
   const ipAddress = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.ip;
   const userAgent = req.headers["user-agent"] || "";
 
-  const { utm_source, utm_medium, utm_campaign, utm_content, utm_term } = req.query;
+  const utms: Record<string, string> = {
+    utm_source: String(req.query.utm_source || ""),
+    utm_medium: String(req.query.utm_medium || ""),
+    utm_campaign: String(req.query.utm_campaign || ""),
+    utm_content: String(req.query.utm_content || ""),
+    utm_term: String(req.query.utm_term || ""),
+  };
 
-  const launch = mockDb.launches.find((l) => l.slug === slug);
+  const routeResult = launchRouterService.routeVisitor({
+    slug,
+    ipAddress,
+    userAgent,
+    utms,
+  });
 
-  if (!launch) {
+  if (!routeResult) {
     res.status(404).send("<h1>Lançamento não encontrado ou encerrado.</h1>");
     return;
   }
 
-  logger.info({ slug, ipAddress, utm_source, utm_campaign }, "Launch link clicked (/l/:slug)");
-
-  // Mock group invite link (in production: dynamic group from WhatsApp instance)
-  const targetGroupInvite = "https://chat.whatsapp.com/sample_invite_group_gfb";
+  logger.info(
+    { slug, targetGroup: routeResult.groupName, occupancy: `${routeResult.occupancyPct}%` },
+    "Launch link resolved and redirected (/l/:slug)"
+  );
 
   // Check if requested via API/JSON or Browser Redirect
   if (req.headers.accept?.includes("application/json")) {
     res.json({
-      launchName: launch.name,
-      slug: launch.slug,
-      inviteUrl: targetGroupInvite,
-      currentMembers: launch.currentMembers,
-      maxMembers: launch.maxMembers,
-      isAccepting: launch.currentMembers < launch.maxMembers,
+      success: true,
+      inviteUrl: routeResult.targetUrl,
+      groupName: routeResult.groupName,
+      groupNumber: routeResult.groupNumber,
+      occupancyPct: routeResult.occupancyPct,
+      isNewGroupCreated: routeResult.isNewGroupCreated,
+      leadId: routeResult.leadId,
     });
     return;
   }
@@ -72,11 +85,11 @@ export async function handleLaunchRedirect(req: Request, res: Response): Promise
 <body>
   <div class="spinner"></div>
   <h2>Conectando ao grupo exclusivo...</h2>
-  <p>Você será redirecionado para o WhatsApp em instantes.</p>
+  <p>Você está sendo direcionado para o <strong>${routeResult.groupName}</strong>.</p>
   <script>
     setTimeout(function() {
-      window.location.href = "${targetGroupInvite}";
-    }, 600);
+      window.location.href = "${routeResult.targetUrl}";
+    }, 450);
   </script>
 </body>
 </html>`);
@@ -110,3 +123,27 @@ export async function toggleGroupStatus(req: Request, res: Response): Promise<vo
   }
   res.json({ success: true, group: grp });
 }
+
+/**
+ * Webhook para eventos de Entrada e Saída de participantes (Evolution API)
+ */
+export async function handleGroupParticipantWebhook(req: Request, res: Response): Promise<void> {
+  try {
+    const { groupNumber, participantPhone, action } = req.body;
+    if (!participantPhone || !action) {
+      res.status(400).json({ error: "Campos obrigatórios ausentes" });
+      return;
+    }
+
+    const result = launchRouterService.handleParticipantUpdate({
+      groupNumber: Number(groupNumber) || 1,
+      participantPhone,
+      action: action as "add" | "remove",
+    });
+
+    res.json({ success: true, result });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+}
+

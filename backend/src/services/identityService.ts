@@ -5,6 +5,7 @@
  */
 
 import { mockDb, MockLead, MockOrder, MockRecoveryItem } from "./mockDb.js";
+import { eventBus } from "./eventBus.js";
 import crypto from "crypto";
 
 export interface LeadTimelineEvent {
@@ -306,6 +307,16 @@ class IdentityService {
       timestamp: new Date().toISOString(),
     });
 
+    // 7. Emitir evento em tempo real via EventBus (SSE)
+    eventBus.broadcast({
+      type: "PURCHASE_APPROVED",
+      payload: {
+        lead: { id: lead.id, name: lead.name, email: lead.email, phone: lead.phone, rfmPoints: lead.rfmPoints },
+        order: { id: order.id, product: order.productName, value: Number(order.grossAmountCents) / 100 },
+        recoveryClosed: closedRecoveryItem ? { id: closedRecoveryItem.id, type: closedRecoveryItem.type } : null,
+      },
+    });
+
     return { lead, order, closedRecoveryItem, capiPayload };
   }
 
@@ -377,6 +388,16 @@ class IdentityService {
       channel: params.platform,
       metadata: { recoveryId: recoveryItem.id, deduplicated: !!existing },
       timestamp: new Date().toISOString(),
+    });
+
+    // Emitir evento em tempo real via EventBus (SSE)
+    eventBus.broadcast({
+      type: "CART_ABANDONED",
+      payload: {
+        recoveryItem,
+        lead: { id: lead.id, name: lead.name, phone: lead.phone },
+        isDuplicate: !!existing,
+      },
     });
 
     return { lead, recoveryItem, isDuplicate: !!existing };
