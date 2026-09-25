@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   TrendingUp,
   BarChart3,
@@ -8,10 +8,17 @@ import {
   Filter,
   CheckCircle2,
   Percent,
-  Calendar
+  Calendar,
+  Download,
+  FileText,
+  FileSpreadsheet,
+  Sparkles,
+  Printer,
 } from 'lucide-react';
 
 export function ClientReports() {
+  const [downloadingFormat, setDownloadingFormat] = useState<string | null>(null);
+
   const funnelSteps = [
     { label: 'Cliques nos Anúncios Meta', value: '12.450', sub: 'Tráfego pago rastreado via CAPI v3.0', pct: '100%', color: 'var(--accent-cyan)' },
     { label: 'Entradas no Grupo VIP WhatsApp', value: '4.766', sub: 'Leads que abriram o link /l/bruna-vip', pct: '38.2%', color: 'var(--accent-purple)' },
@@ -39,9 +46,20 @@ export function ClientReports() {
 
   const maxVal = Math.max(...days.map((d) => d.in));
 
+  const handleExport = (format: 'pdf' | 'excel' | 'csv') => {
+    setDownloadingFormat(format);
+    const url = `/api/reports/export/${format}?clientId=cli_bruna_ppp`;
+    if (format === 'pdf') {
+      window.open(url, '_blank');
+    } else {
+      window.location.href = url;
+    }
+    setTimeout(() => setDownloadingFormat(null), 1500);
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      {/* Header */}
+      {/* Header with 1-Click Export Actions */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px' }}>
         <div>
           <h2 style={{ fontSize: '1.4rem', fontWeight: 800, letterSpacing: '-0.02em' }}>
@@ -51,11 +69,93 @@ export function ClientReports() {
             Visão consolidada da jornada completa: do primeiro clique no anúncio até a compra aprovada no WhatsApp.
           </p>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span className="badge badge-green">
+
+        {/* 1-Click Export Buttons (Fase 7.5) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <button
+            onClick={() => handleExport('pdf')}
+            className="btn btn-secondary"
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem' }}
+          >
+            <Printer size={14} color="var(--accent-purple)" />
+            {downloadingFormat === 'pdf' ? 'Gerando...' : 'Baixar PDF'}
+          </button>
+
+          <button
+            onClick={() => handleExport('excel')}
+            className="btn btn-secondary"
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem' }}
+          >
+            <FileSpreadsheet size={14} color="var(--accent-green)" />
+            {downloadingFormat === 'excel' ? 'Exportando...' : 'Exportar Excel'}
+          </button>
+
+          <button
+            onClick={() => handleExport('csv')}
+            className="btn btn-secondary"
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem' }}
+          >
+            <Download size={14} color="var(--accent-cyan)" />
+            {downloadingFormat === 'csv' ? 'Baixando...' : 'Exportar CSV'}
+          </button>
+
+          <span className="badge badge-green" style={{ fontSize: '0.72rem' }}>
             <ShieldCheck size={12} />
-            Atribuição Determinística CAPI Ativa
+            CAPI v3.0 Ativo
           </span>
+        </div>
+      </div>
+
+      {/* 7.4 Projeção Preditiva de Faturamento com IA */}
+      <div
+        className="glass-panel"
+        style={{
+          padding: '24px',
+          border: '1px solid rgba(139, 92, 246, 0.35)',
+          background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.08) 0%, rgba(6, 182, 212, 0.04) 100%)',
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Sparkles size={18} color="var(--accent-purple)" />
+            <h3 style={{ fontSize: '1.15rem', fontWeight: 800 }}>
+              Projeção Preditiva com IA: Fechamento de Lançamento
+            </h3>
+            <span className="badge badge-purple">Confiança Estatística: 92%</span>
+          </div>
+          <span style={{ fontSize: '0.78rem', color: 'var(--text-dim)' }}>
+            Curva de Lançamento (D1: 35% • D2: 15% • D3: 10% • D4: 8% • D5-D7: 32%)
+          </span>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px', marginBottom: '16px' }}>
+          <div style={{ background: 'rgba(255,255,255,0.03)', padding: '14px', borderRadius: '10px' }}>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>Faturamento Atual</div>
+            <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#fff' }}>R$ 87.400</div>
+            <div style={{ fontSize: '0.68rem', color: 'var(--accent-cyan)', marginTop: '2px' }}>Dia 4 de 7 aberto</div>
+          </div>
+
+          <div style={{ background: 'rgba(255,255,255,0.03)', padding: '14px', borderRadius: '10px' }}>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>Projeção Preditiva Final</div>
+            <div style={{ fontSize: '1.5rem', fontWeight: 900, color: 'var(--accent-green)' }}>R$ 158.400</div>
+            <div style={{ fontSize: '0.68rem', color: 'var(--text-dim)', marginTop: '2px' }}>Faixa: R$ 142k a R$ 168k</div>
+          </div>
+
+          <div style={{ background: 'rgba(255,255,255,0.03)', padding: '14px', borderRadius: '10px' }}>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>Meta Estabelecida</div>
+            <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--accent-amber)' }}>R$ 150.000</div>
+            <div style={{ fontSize: '0.68rem', color: 'var(--accent-green)', marginTop: '2px' }}>+5.6% acima da meta</div>
+          </div>
+
+          <div style={{ background: 'rgba(255,255,255,0.03)', padding: '14px', borderRadius: '10px' }}>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>Velocidade Horária</div>
+            <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--accent-cyan)' }}>R$ 640/h</div>
+            <div style={{ fontSize: '0.68rem', color: 'var(--text-dim)', marginTop: '2px' }}>Média das últimas 24h</div>
+          </div>
+        </div>
+
+        <div style={{ background: 'rgba(0,0,0,0.25)', padding: '12px 16px', borderRadius: '8px', border: '1px solid var(--border-subtle)', fontSize: '0.82rem', color: '#fff', lineHeight: 1.5 }}>
+          💡 <strong>Recomendação da IA:</strong> Com a taxa de conversão atual de 4.8% nos grupos VIP e retenção de 89.3%, a projeção fecha em R$ 158.400, superando a meta. Recomendamos aumentar o orçamento nos conjuntos de lookalike de compradores e ativar o disparo de recuperação de PIX pendente para resgatar ~R$ 18.000 antes do encerramento.
         </div>
       </div>
 
@@ -74,120 +174,92 @@ export function ClientReports() {
                 background: 'rgba(255, 255, 255, 0.03)',
                 border: '1px solid var(--border-subtle)',
                 borderRadius: '12px',
-                padding: '16px',
-                position: 'relative',
+                padding: '18px',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
               }}
             >
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginBottom: '4px' }}>Etapa 0{idx + 1}</div>
-              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: step.color }}>{step.value}</div>
-              <div style={{ fontSize: '0.82rem', fontWeight: 700, margin: '4px 0', minHeight: '38px' }}>{step.label}</div>
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginBottom: '8px' }}>{step.sub}</div>
+              <div>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '4px' }}>
+                  Etapa {idx + 1}
+                </div>
+                <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#fff', marginBottom: '8px', minHeight: '40px' }}>
+                  {step.label}
+                </div>
+                <div style={{ fontSize: '1.6rem', fontWeight: 900, color: step.color, marginBottom: '4px' }}>
+                  {step.value}
+                </div>
+              </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                <span style={{ fontSize: '0.68rem', color: 'var(--text-dim)' }}>Retenção</span>
-                <span className="badge badge-green" style={{ fontSize: '0.65rem' }}>
-                  {step.pct}
-                </span>
+              <div>
+                <div style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.06)', borderRadius: '2px', overflow: 'hidden', margin: '8px 0' }}>
+                  <div style={{ width: step.pct, height: '100%', background: step.color, borderRadius: '2px' }} />
+                </div>
+                <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)' }}>{step.sub}</div>
               </div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Graph: Entradas vs Saídas nos Grupos (padrão grupovip) */}
+      {/* 14-Day Member Inflow vs Outflow Chart */}
       <div className="glass-panel" style={{ padding: '24px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', flexWrap: 'wrap', gap: '10px' }}>
           <div>
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Users size={18} color="var(--accent-cyan)" />
-              Fluxo de Participantes nos Grupos VIP (Últimos 14 dias)
-            </h3>
-            <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-              Comparativo de entradas via link inteligente contra saídas voluntárias do WhatsApp.
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 800 }}>Fluxo de Participantes nos Grupos VIP (Últimos 14 Dias)</h3>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+              Comparativo diário de Entradas vs Saídas com taxa de retenção calculada.
             </p>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px', fontSize: '0.75rem' }}>
+          <div style={{ display: 'flex', gap: '14px', fontSize: '0.78rem' }}>
             <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10B981' }} />
-              Entradas (+4.766)
+              <span style={{ width: '10px', height: '10px', borderRadius: '3px', background: 'var(--accent-green)' }} />
+              Entradas (Verde)
             </span>
             <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#EF4444' }} />
-              Saídas (-508)
+              <span style={{ width: '10px', height: '10px', borderRadius: '3px', background: 'var(--accent-rose)' }} />
+              Saídas (Vermelho)
             </span>
-            <span className="badge badge-cyan">89,3% Taxa de Retenção</span>
           </div>
         </div>
 
-        {/* CSS Bar Chart */}
-        <div
-          style={{
-            height: '200px',
-            display: 'flex',
-            alignItems: 'flex-end',
-            gap: '8px',
-            paddingTop: '20px',
-            borderBottom: '1px solid var(--border-subtle)',
-          }}
-        >
-          {days.map((d, i) => {
-            const barHeight = Math.round((d.in / maxVal) * 160);
+        <div style={{ height: '220px', display: 'flex', alignItems: 'flex-end', gap: '8px', paddingBottom: '20px', borderBottom: '1px solid var(--border-subtle)' }}>
+          {days.map((d, idx) => {
+            const inHeight = Math.round((d.in / maxVal) * 160);
             const outHeight = Math.round((d.out / maxVal) * 160);
             return (
-              <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', justifyContent: 'flex-end' }}>
-                <div style={{ display: 'flex', alignItems: 'flex-end', gap: '3px', width: '100%', justifyContent: 'center' }}>
+              <div key={idx} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                <div style={{ display: 'flex', gap: '2px', alignItems: 'flex-end', height: '170px' }}>
                   <div
-                    title={`${d.date}: +${d.in} entradas`}
                     style={{
-                      width: '60%',
-                      maxWidth: '18px',
-                      height: `${barHeight}px`,
-                      background: 'linear-gradient(180deg, #10B981, #059669)',
-                      borderRadius: '4px 4px 0 0',
+                      width: '12px',
+                      height: `${inHeight}px`,
+                      background: 'var(--accent-green)',
+                      borderRadius: '3px 3px 0 0',
                     }}
+                    title={`Entradas: ${d.in}`}
                   />
                   <div
-                    title={`${d.date}: -${d.out} saídas`}
                     style={{
-                      width: '30%',
-                      maxWidth: '8px',
+                      width: '6px',
                       height: `${outHeight}px`,
-                      background: '#EF4444',
-                      borderRadius: '2px 2px 0 0',
+                      background: 'var(--accent-rose)',
+                      borderRadius: '3px 3px 0 0',
                     }}
+                    title={`Saídas: ${d.out}`}
                   />
                 </div>
-                <div style={{ fontSize: '0.65rem', color: 'var(--text-dim)', marginTop: '8px' }}>{d.date}</div>
+                <span style={{ fontSize: '0.65rem', color: 'var(--text-dim)' }}>{d.date}</span>
               </div>
             );
           })}
         </div>
-      </div>
 
-      {/* 4 Bottom Performance Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
-        <div className="glass-panel" style={{ padding: '20px' }}>
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>CPA MÉDIO (POR COMPRA)</div>
-          <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--accent-green)', margin: '4px 0' }}>R$ 38,40</div>
-          <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>Ticket Médio: R$ 993,00</div>
-        </div>
-
-        <div className="glass-panel" style={{ padding: '20px' }}>
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>ROAS REAL ATRIBUÍDO</div>
-          <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--accent-cyan)', margin: '4px 0' }}>4.8x</div>
-          <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>CAPI + Webhook Kiwify</div>
-        </div>
-
-        <div className="glass-panel" style={{ padding: '20px' }}>
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>DEDUPLICAÇÃO CAPI</div>
-          <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--accent-purple)', margin: '4px 0' }}>99,98%</div>
-          <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>Zero perda Browser/Server</div>
-        </div>
-
-        <div className="glass-panel" style={{ padding: '20px' }}>
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>EVENT MATCH QUALITY</div>
-          <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--accent-amber)', margin: '4px 0' }}>8.8 / 10</div>
-          <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>Classificação Excelente Meta</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px', fontSize: '0.8rem', color: 'var(--text-dim)' }}>
+          <span>Taxa de Retenção Acumulada: <strong style={{ color: 'var(--accent-green)' }}>89.3%</strong></span>
+          <span>Total de Entradas: <strong style={{ color: '#fff' }}>4.766 membros</strong></span>
+          <span>Total de Saídas: <strong style={{ color: 'var(--accent-rose)' }}>508 saídas</strong></span>
         </div>
       </div>
     </div>

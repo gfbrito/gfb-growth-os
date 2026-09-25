@@ -1,162 +1,170 @@
-import { PrismaClient, UserRole, TaskStatus, TaskPriority } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log("🌱 Seeding GFB Growth OS database...");
+  console.log("🌱 Iniciando Database Seeding do GFB Growth OS...");
 
-  const passwordHash = await bcrypt.hash("gfb2026@master", 10);
-
-  // 1. Create Organization (GFB Digital)
+  // 1. Organização Agência Master
   const org = await prisma.organization.upsert({
     where: { slug: "gfb-digital" },
     update: {},
     create: {
-      name: "GFB Digital",
+      id: "org_gfb_master",
+      name: "GFB Digital Master Agency",
       slug: "gfb-digital",
       plan: "ENTERPRISE",
+      isActive: true,
     },
   });
+  console.log(`✅ Organização criada/verificada: ${org.name}`);
 
-  // 2. Create Super Admin / Agency Owner
-  const owner = await prisma.user.upsert({
+  // 2. Usuários Principais
+  const passwordHash = await bcrypt.hash("gfb@growth2026", 10);
+
+  const adminUser = await prisma.user.upsert({
     where: { email: "gisley@gfbdigital.com.br" },
     update: {},
     create: {
+      id: "usr_gisley_master",
       email: "gisley@gfbdigital.com.br",
       name: "Gisley Fernandes",
       passwordHash,
       isActive: true,
-      memberships: {
-        create: {
-          organizationId: org.id,
-          role: UserRole.OWNER,
-        },
-      },
+      avatarUrl: "https://api.dicebear.com/7.x/avataaars/svg?seed=Gisley",
     },
   });
 
-  // 3. Create Sample Gestor de Tráfego
-  const gestor = await prisma.user.upsert({
-    where: { email: "gestor@gfbdigital.com.br" },
+  const clientUser = await prisma.user.upsert({
+    where: { email: "contato@brunaortiz.com.br" },
     update: {},
     create: {
-      email: "gestor@gfbdigital.com.br",
-      name: "Gestor de Tráfego Alpha",
+      id: "usr_bruna_client",
+      email: "contato@brunaortiz.com.br",
+      name: "Bruna Ortiz",
       passwordHash,
       isActive: true,
-      memberships: {
-        create: {
-          organizationId: org.id,
-          role: UserRole.GESTOR,
-        },
-      },
+      avatarUrl: "https://api.dicebear.com/7.x/avataaars/svg?seed=Bruna",
     },
   });
 
-  // 4. Create Sample Client (Bruna Ortiz - PPP)
-  const client = await prisma.client.upsert({
+  // Vincular membro na organização
+  await prisma.organizationMember.upsert({
     where: {
-      organizationId_slug: {
+      organizationId_userId: {
         organizationId: org.id,
-        slug: "brunaortiz_ppp",
+        userId: adminUser.id,
       },
     },
     update: {},
     create: {
       organizationId: org.id,
-      name: "Bruna Ortiz - PPP",
-      slug: "brunaortiz_ppp",
-      revenueGoalCents: BigInt(15000000), // R$ 150.000,00 de meta mensal
-      isActive: true,
-      members: {
-        create: [
-          {
-            userId: gestor.id,
-            isPrimaryGestor: true,
-          },
-        ],
-      },
-      pixels: {
-        create: {
-          pixelId: "123456789012345",
-          pixelKey: "brunaortiz_ppp",
-          capiToken: "EAAB_SAMPLE_META_ACCESS_TOKEN_GFB",
-          isActive: true,
-        },
-      },
-      products: {
-        create: {
-          name: "Programa Primeira Página (PPP)",
-          externalId: "kiwi_prod_ppp_001",
-          platform: "KIWIFY",
-          priceCents: BigInt(99700), // R$ 997,00
-          isActive: true,
-        },
-      },
+      userId: adminUser.id,
+      role: "SUPER_ADMIN",
     },
   });
 
-  // 5. Create Initial Onboarding Tasks (ClickUp Style)
-  const tasksToCreate = [
-    {
-      title: "Verificação e Blindagem do CAPI (Meta Graph API)",
-      descriptionMarkdown: "Verificar o disparo de PageView e InitiateCheckout com EMQ superior a 8.5.",
-      priority: TaskPriority.URGENT,
-      status: TaskStatus.DONE,
-      timeEstimateMinutes: 60,
+  // 3. Cliente: Bruna Ortiz - Pílula da Produtividade
+  const client = await prisma.client.upsert({
+    where: {
+      organizationId_slug: {
+        organizationId: org.id,
+        slug: "brunaortiz-ppp",
+      },
     },
+    update: {},
+    create: {
+      id: "cli_bruna_ppp",
+      organizationId: org.id,
+      name: "Bruna Ortiz (Pílula da Produtividade)",
+      slug: "brunaortiz-ppp",
+      revenueGoalCents: BigInt(20000000), // R$ 200.000,00
+      isActive: true,
+    },
+  });
+  console.log(`✅ Cliente cadastrado: ${client.name}`);
+
+  // 4. Pixel CAPI
+  await prisma.clientPixel.upsert({
+    where: { pixelKey: "brunaortiz_ppp" },
+    update: {},
+    create: {
+      clientId: client.id,
+      pixelId: "88492019482910",
+      pixelKey: "brunaortiz_ppp",
+      capiToken: "EAABs8109dsmAkP98127391823719283719827391827391827",
+      testCode: "TEST89123",
+      isActive: true,
+    },
+  });
+
+  // 5. Mini ClickUp: Tarefas Iniciais do Lançamento
+  const initialTasks = [
     {
-      title: "Configurar Instância de WhatsApp e SendGate Anti-Ban",
-      descriptionMarkdown: "Conectar instância Evolution v2 e inicializar rotina de aquecimento com cronotipo madrugador.",
-      priority: TaskPriority.HIGH,
-      status: TaskStatus.IN_PROGRESS,
+      title: "Configurar Snippet CAPI e Webhook Kiwify",
+      descriptionMarkdown: "Instalar tag `/s/brunaortiz_ppp.js` na página de obrigado e no checkout da Kiwify para deduplicação.",
+      status: "DONE" as const,
+      priority: "URGENT" as const,
+      dueDate: new Date("2026-09-24"),
       timeEstimateMinutes: 45,
+      timeSpentMinutes: 45,
     },
     {
-      title: "Subir Criativos de Validação de Escala",
-      descriptionMarkdown: "Testar novos ângulos de Reels com legenda 9:16 e destaque de palavras.",
-      priority: TaskPriority.NORMAL,
-      status: TaskStatus.TODO,
-      timeEstimateMinutes: 120,
-    },
-    {
-      title: "Ativar Régua de Recuperação de Carrinho e PIX Pendente",
-      descriptionMarkdown: "Conectar webhook Kiwify e validar fechamento automático de recuperação pós-compra.",
-      priority: TaskPriority.HIGH,
-      status: TaskStatus.TODO,
+      title: "Aquecer 5 Chips no Warming Network P2P",
+      descriptionMarkdown: "Executar curvas graduais de 15 a 85 mensagens/dia simulando áudio e digitação natural.",
+      status: "IN_PROGRESS" as const,
+      priority: "HIGH" as const,
+      dueDate: new Date("2026-09-26"),
       timeEstimateMinutes: 90,
+      timeSpentMinutes: 45,
+    },
+    {
+      title: "Renderizar 12 Vídeos de Criativos em 9:16 (Legenda Rápida)",
+      descriptionMarkdown: "Cortar silêncios acima de 500ms e aplicar legenda dinâmica vertical no estilo Hormozi.",
+      status: "TODO" as const,
+      priority: "NORMAL" as const,
+      dueDate: new Date("2026-09-28"),
+      timeEstimateMinutes: 120,
+      timeSpentMinutes: 0,
+    },
+    {
+      title: "Importar Base de 4.081 Leads CSV com Normalização E.164",
+      descriptionMarkdown: "Fazer upload da base histórica, sanitizar telefones para +55 e calcular scores RFM.",
+      status: "DONE" as const,
+      priority: "HIGH" as const,
+      dueDate: new Date("2026-09-25"),
+      timeEstimateMinutes: 60,
+      timeSpentMinutes: 30,
     },
   ];
 
-  for (const t of tasksToCreate) {
+  for (const t of initialTasks) {
     await prisma.task.create({
       data: {
         organizationId: org.id,
         clientId: client.id,
-        creatorUserId: owner.id,
-        assignedUserId: gestor.id,
+        createdById: adminUser.id,
+        assignedToId: adminUser.id,
         title: t.title,
         descriptionMarkdown: t.descriptionMarkdown,
-        priority: t.priority,
         status: t.status,
+        priority: t.priority,
+        dueDate: t.dueDate,
         timeEstimateMinutes: t.timeEstimateMinutes,
-        dueDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // Em 3 dias
+        timeSpentMinutes: t.timeSpentMinutes,
+        labels: ["Mini ClickUp", "Lançamento"],
       },
     });
   }
 
-  console.log("✅ Seed completed successfully!");
-  console.log(`- Organization: ${org.name} (${org.slug})`);
-  console.log(`- Owner: ${owner.email}`);
-  console.log(`- Gestor: ${gestor.email}`);
-  console.log(`- Client: ${client.name} (${client.slug})`);
+  console.log("✅ 4 Tarefas operacionais do Mini ClickUp semeadas.");
+  console.log("🎉 Seeding finalizado com sucesso!");
 }
 
 main()
   .catch((e) => {
-    console.error("❌ Seed failed:", e);
+    console.error("❌ Erro durante o seeding:", e);
     process.exit(1);
   })
   .finally(async () => {

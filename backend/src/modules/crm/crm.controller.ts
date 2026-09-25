@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { mockDb } from "../../services/mockDb.js";
+import { csvImporterService } from "../../services/csvImporterService.js";
 
 export async function listLeads(req: Request, res: Response): Promise<void> {
   const { temperature, stage, clientId } = req.query;
@@ -102,12 +103,17 @@ export async function updateRecoveryStatus(req: Request, res: Response): Promise
 }
 
 export async function importCsv(req: Request, res: Response): Promise<void> {
-  const { rows } = req.body;
-  if (!Array.isArray(rows) || rows.length === 0) {
-    res.status(400).json({ error: "Nenhuma linha enviada para importação" });
-    return;
-  }
+  try {
+    const { rows, clientId } = req.body;
+    if (!Array.isArray(rows) || rows.length === 0) {
+      res.status(400).json({ error: "Nenhuma linha enviada para importação" });
+      return;
+    }
 
-  const result = mockDb.importCsvRows(rows);
-  res.json({ success: true, ...result });
+    const summary = await csvImporterService.processStreamBatch(rows, clientId as string || "cli_bruna_ppp");
+    res.json({ success: true, ...summary });
+  } catch (err: any) {
+    res.status(500).json({ error: "Falha na importação do CSV", message: err.message });
+  }
 }
+

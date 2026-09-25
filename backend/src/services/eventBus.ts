@@ -7,7 +7,15 @@
 import { Response } from "express";
 
 export interface SystemEvent {
-  type: "PURCHASE_APPROVED" | "CART_ABANDONED" | "GROUP_JOIN" | "CAPI_DISPATCHED" | "TASK_UPDATED";
+  type:
+    | "PURCHASE_APPROVED"
+    | "CART_ABANDONED"
+    | "GROUP_JOIN"
+    | "CAPI_DISPATCHED"
+    | "TASK_UPDATED"
+    | "CSV_IMPORTED"
+    | "WARMING_STEP"
+    | "INSTANCE_STATUS_CHANGED";
   payload: any;
   timestamp: string;
 }

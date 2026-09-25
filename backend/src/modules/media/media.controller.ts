@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { mediaEngineService } from "../../services/mediaEngineService.js";
+import { chunkUploadService } from "../../services/chunkUploadService.js";
 
 export interface MockMediaJob {
   id: string;
@@ -79,7 +80,7 @@ export async function createCaptionJob(req: Request, res: Response): Promise<voi
 
   mockMediaJobs.unshift(newJob);
 
-  // Simulate completion after 5 seconds
+  // Simulate completion after 4 seconds
   setTimeout(() => {
     newJob.status = "COMPLETED";
     newJob.progress = 100;
@@ -116,4 +117,93 @@ export async function exportJobMarkdown(req: Request, res: Response): Promise<vo
   res.setHeader("Content-Disposition", `attachment; filename="ata_${id}.md"`);
   res.send(diarization.markdownExport);
 }
+
+// ==================== CHUNKED UPLOAD CONTROLLERS ====================
+
+export async function initChunkUpload(req: Request, res: Response): Promise<void> {
+  try {
+    const { fileName, fileSizeBytes, mimeType } = req.body;
+    if (!fileName || !fileSizeBytes) {
+      res.status(400).json({ error: "fileName e fileSizeBytes são obrigatórios." });
+      return;
+    }
+
+    const session = chunkUploadService.initUploadSession({
+      fileName,
+      fileSizeBytes: Number(fileSizeBytes),
+      mimeType,
+    });
+
+    res.json({ success: true, session });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+}
+
+export async function receiveChunk(req: Request, res: Response): Promise<void> {
+  try {
+    const { uploadId, chunkIndex, chunkDataSize } = req.body;
+    if (!uploadId || chunkIndex === undefined) {
+      res.status(400).json({ error: "uploadId e chunkIndex são obrigatórios." });
+      return;
+    }
+
+    const result = chunkUploadService.receiveChunk({
+      uploadId,
+      chunkIndex: Number(chunkIndex),
+      chunkDataSize: Number(chunkDataSize || 0),
+    });
+
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+}
+
+export async function completeChunkUpload(req: Request, res: Response): Promise<void> {
+  try {
+    const { uploadId } = req.body;
+    if (!uploadId) {
+      res.status(400).json({ error: "uploadId é obrigatório." });
+      return;
+    }
+
+    const session = chunkUploadService.finalizeUpload(uploadId);
+
+    // Cria automaticamente o Job no pipeline de Mídia
+    const newJob: MockMediaJob = {
+      id: `job_cap_${Date.now()}`,
+      type: "CAPTION_REEL_916",
+      status: "PROCESSING",
+      title: session.fileName,
+      progress: 30,
+      durationSeconds: 45,
+      createdAt: new Date().toISOString(),
+    };
+    mockMediaJobs.unshift(newJob);
+
+    setTimeout(() => {
+      newJob.status = "COMPLETED";
+      newJob.progress = 100;
+      newJob.outputVideoUrl = session.outputMediaUrl;
+    }, 3500);
+
+    res.json({ success: true, session, job: newJob });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+}
+
+export async function getChunkUploadStatus(req: Request, res: Response): Promise<void> {
+  const uploadId = String(req.params.uploadId);
+  const session = chunkUploadService.getSession(uploadId);
+
+  if (!session) {
+    res.status(404).json({ error: "Sessão de upload não encontrada." });
+    return;
+  }
+
+  res.json({ session });
+}
+
 

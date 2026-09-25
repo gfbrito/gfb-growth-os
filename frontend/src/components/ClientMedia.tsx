@@ -35,6 +35,85 @@ export function ClientMedia() {
     { id: 'cap_3', text: 'Com o CAPI Gateway v3.0, a atribuição é 100% mantida.', edited: false },
   ]);
 
+  // Chunked Upload Engine state
+  const [isUploadingChunked, setIsUploadingChunked] = useState(false);
+  const [chunkProgress, setChunkProgress] = useState(0);
+  const [currentChunk, setCurrentChunk] = useState(0);
+  const [totalChunks, setTotalChunks] = useState(30);
+  const [uploadFeedback, setUploadFeedback] = useState<string | null>(null);
+  const [processedVideos, setProcessedVideos] = useState([
+    { name: 'criativo_escala_ppp_01_916.mp4', size: '24.2 MB', silences: '4 silêncios cortados', time: 'Hoje às 10:14' },
+    { name: 'convite_grupo_vip_outubro_916.mp4', size: '18.6 MB', silences: '6 silêncios cortados', time: 'Ontem às 18:22' },
+  ]);
+
+  const handleSimulateChunkUpload = async () => {
+    setIsUploadingChunked(true);
+    setChunkProgress(0);
+    setCurrentChunk(0);
+    setUploadFeedback('Inicializando sessão particionada (300 MB em chunks de 10 MB)...');
+
+    try {
+      const initRes = await fetch('/api/media/upload/init', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fileName: 'Aula_Inaugural_Acupuntura_ProRes.mov',
+          fileSizeBytes: 314572800,
+          mimeType: 'video/quicktime',
+        }),
+      });
+      const initData = await initRes.json();
+      const uploadId = initData.session.id;
+      const chunksCount = initData.session.totalChunks || 30;
+      setTotalChunks(chunksCount);
+
+      for (let i = 0; i < chunksCount; i++) {
+        await new Promise((r) => setTimeout(r, 60));
+        setCurrentChunk(i + 1);
+        const percent = Math.round(((i + 1) / chunksCount) * 100);
+        setChunkProgress(percent);
+        setUploadFeedback(`Enviando chunk ${i + 1} de ${chunksCount} (10 MB cada) — Codec ProRes validado`);
+
+        await fetch('/api/media/upload/chunk', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            uploadId,
+            chunkIndex: i,
+            chunkDataSize: 10485760,
+          }),
+        });
+      }
+
+      setUploadFeedback('Reagrupando fatias e enviando para o worker FFmpeg 9:16...');
+      const compRes = await fetch('/api/media/upload/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uploadId }),
+      });
+      await compRes.json();
+
+      setProcessedVideos((prev) => [
+        {
+          name: 'Aula_Inaugural_Acupuntura_ProRes_916.mp4',
+          size: '300 MB',
+          silences: '4 silêncios cortados • ProRes',
+          time: 'Agora mesmo',
+        },
+        ...prev,
+      ]);
+
+      setUploadFeedback('Upload de 300 MB concluído e reenquadrado com sucesso!');
+      setTimeout(() => {
+        setIsUploadingChunked(false);
+        setUploadFeedback(null);
+      }, 3500);
+    } catch (err: any) {
+      setUploadFeedback(`Erro no upload: ${err.message}`);
+      setIsUploadingChunked(false);
+    }
+  };
+
   const toggleSilenceCut = (id: string) => {
     setSilenceBlocks((prev) =>
       prev.map((s) => (s.id === id ? { ...s, cut: !s.cut } : s))
@@ -170,26 +249,70 @@ export function ClientMedia() {
                 Envie um vídeo bruto e receba de volta reenquadrado verticalmente com fundo desfocado, corte de silêncios secos e destaque palavra por palavra.
               </p>
 
-              {/* Dropzone */}
+              {/* Dropzone & Chunk Upload Engine */}
               <div
                 style={{
                   border: '2px dashed var(--border-highlight)',
                   borderRadius: '12px',
-                  padding: '32px 20px',
+                  padding: '24px 20px',
                   textAlign: 'center',
                   background: 'rgba(255,255,255,0.01)',
                   marginBottom: '16px',
-                  cursor: 'pointer',
                 }}
-                onClick={() => setShowEditorModal(true)}
               >
                 <Upload size={32} color="var(--accent-purple)" style={{ marginBottom: '8px' }} />
                 <div style={{ fontWeight: 700, fontSize: '0.95rem', marginBottom: '4px' }}>
                   Solte o vídeo aqui ou clique para escolher
                 </div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>
-                  Formatos aceitos: mp4, mov, mkv ou webm — até 2 GB
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginBottom: '12px' }}>
+                  Formatos aceitos: mp4, mov, mkv ou webm — até 2 GB (Chunks de 10 MB)
                 </div>
+
+                <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginBottom: '14px', flexWrap: 'wrap' }}>
+                  <span className="badge badge-purple">H.264 / AVC</span>
+                  <span className="badge badge-cyan">HEVC / H.265</span>
+                  <span className="badge badge-green">Apple ProRes</span>
+                </div>
+
+                {isUploadingChunked ? (
+                  <div style={{ background: 'rgba(0,0,0,0.3)', padding: '14px', borderRadius: '10px', border: '1px solid var(--border-subtle)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', marginBottom: '6px' }}>
+                      <span style={{ color: 'var(--accent-purple)', fontWeight: 700 }}>
+                        Enviando Chunks: {currentChunk} / {totalChunks}
+                      </span>
+                      <span style={{ fontWeight: 800, color: '#fff' }}>{chunkProgress}%</span>
+                    </div>
+                    <div style={{ width: '100%', height: '8px', background: 'rgba(255,255,255,0.08)', borderRadius: '4px', overflow: 'hidden', marginBottom: '8px' }}>
+                      <div
+                        style={{
+                          width: `${chunkProgress}%`,
+                          height: '100%',
+                          background: 'linear-gradient(90deg, #8B5CF6, #06B6D4)',
+                          borderRadius: '4px',
+                          transition: 'width 0.1s ease',
+                        }}
+                      />
+                    </div>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>{uploadFeedback}</div>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                    <button
+                      onClick={handleSimulateChunkUpload}
+                      className="btn btn-primary"
+                      style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+                    >
+                      <Upload size={14} /> Simular Upload em Chunks (300 MB ProRes)
+                    </button>
+                    <button
+                      onClick={() => setShowEditorModal(true)}
+                      className="btn btn-secondary"
+                      style={{ fontSize: '0.8rem' }}
+                    >
+                      <Scissors size={14} /> Abrir Editor Waveform
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Review Before Export Toggle */}
@@ -218,20 +341,15 @@ export function ClientMedia() {
                   style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: 'var(--accent-green)' }}
                 />
               </div>
-
-              <button onClick={() => setShowEditorModal(true)} className="btn btn-primary" style={{ width: '100%' }}>
-                <Scissors size={16} /> Abrir Editor de Revisão com Waveform
-              </button>
             </div>
 
             {/* Ready Results Card */}
             <div className="glass-panel" style={{ padding: '20px' }}>
-              <h4 style={{ fontSize: '0.95rem', fontWeight: 800, marginBottom: '12px' }}>Vídeos Processados nesta Conta (3)</h4>
+              <h4 style={{ fontSize: '0.95rem', fontWeight: 800, marginBottom: '12px' }}>
+                Vídeos Processados nesta Conta ({processedVideos.length})
+              </h4>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {[
-                  { name: 'criativo_escala_ppp_01_916.mp4', size: '24.2 MB', silences: '4 silêncios cortados', time: 'Hoje às 10:14' },
-                  { name: 'convite_grupo_vip_outubro_916.mp4', size: '18.6 MB', silences: '6 silêncios cortados', time: 'Ontem às 18:22' },
-                ].map((vid, idx) => (
+                {processedVideos.map((vid, idx) => (
                   <div
                     key={idx}
                     style={{

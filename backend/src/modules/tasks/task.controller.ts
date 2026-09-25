@@ -59,7 +59,7 @@ export async function createTask(req: Request, res: Response): Promise<void> {
 
 export async function updateTaskStatus(req: Request, res: Response): Promise<void> {
   const id = String(req.params.id);
-  const { status, priority, timeSpentMinutes } = req.body;
+  const { status, priority, timeSpentMinutes, timeEstimateMinutes, title, descriptionMarkdown, checklists } = req.body;
 
   const taskIndex = mockDb.tasks.findIndex((t) => t.id === id);
 
@@ -70,9 +70,40 @@ export async function updateTaskStatus(req: Request, res: Response): Promise<voi
 
   if (status) mockDb.tasks[taskIndex].status = status;
   if (priority) mockDb.tasks[taskIndex].priority = priority;
+  if (title) mockDb.tasks[taskIndex].title = title;
+  if (descriptionMarkdown !== undefined) mockDb.tasks[taskIndex].descriptionMarkdown = descriptionMarkdown;
   if (timeSpentMinutes !== undefined) mockDb.tasks[taskIndex].timeSpentMinutes = Number(timeSpentMinutes);
+  if (timeEstimateMinutes !== undefined) mockDb.tasks[taskIndex].timeEstimateMinutes = Number(timeEstimateMinutes);
+  if (checklists) mockDb.tasks[taskIndex].checklists = checklists;
 
   res.json({ task: mockDb.tasks[taskIndex] });
+}
+
+export async function toggleChecklistItem(req: Request, res: Response): Promise<void> {
+  const id = String(req.params.id);
+  const checklistId = String(req.params.checklistId);
+
+  const task = mockDb.tasks.find((t) => t.id === id);
+  if (!task || !task.checklists) {
+    res.status(404).json({ error: "Tarefa ou checklist não encontrado" });
+    return;
+  }
+
+  const item = task.checklists.find((c) => c.id === checklistId);
+  if (!item) {
+    res.status(404).json({ error: "Item do checklist não encontrado" });
+    return;
+  }
+
+  item.done = !item.done;
+
+  // Se todos os checklists forem concluídos, sugere ou move para REVIEW/DONE
+  const allDone = task.checklists.every((c) => c.done);
+  if (allDone && task.status !== "DONE") {
+    task.status = "REVIEW";
+  }
+
+  res.json({ success: true, task });
 }
 
 export async function deleteTask(req: Request, res: Response): Promise<void> {

@@ -13,6 +13,7 @@ import { authRoutes } from "./modules/auth/auth.routes.js";
 import { trackingRoutes } from "./modules/tracking/tracking.routes.js";
 import { webhookRoutes } from "./modules/tracking/webhooks/webhook.routes.js";
 import { apiRoutes } from "./routes/api.routes.js";
+import { authUserMiddleware } from "./middlewares/rbacMiddleware.js";
 
 // Global BigInt JSON serialization support
 (BigInt.prototype as any).toJSON = function () {
@@ -60,13 +61,14 @@ app.use(
     origin: [env.FRONTEND_URL, "http://localhost:3000"],
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "X-User-Role"],
   })
 );
 
 app.use(cookieParser(env.COOKIE_SECRET));
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+app.use(authUserMiddleware);
 
 // Request logging
 app.use((req, res, next) => {
@@ -121,6 +123,9 @@ app.get("/health", async (_req: Request, res: Response) => {
 });
 
 // API Routes
+app.get("/api/auth/me", (req: Request, res: Response) => {
+  res.json({ user: req.user });
+});
 app.use("/api/auth", authRoutes);
 app.use(trackingRoutes);
 app.use(webhookRoutes);

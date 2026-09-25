@@ -27,6 +27,12 @@ export interface MockClient {
   pixelId: string;
 }
 
+export interface MockTaskChecklistItem {
+  id: string;
+  title: string;
+  done: boolean;
+}
+
 export interface MockTask {
   id: string;
   clientId: string;
@@ -39,6 +45,7 @@ export interface MockTask {
   timeEstimateMinutes: number;
   timeSpentMinutes: number;
   labels: string[];
+  checklists?: MockTaskChecklistItem[];
 }
 
 export interface MockLead {
@@ -64,7 +71,7 @@ export interface MockOrder {
   productName: string;
   grossAmountCents: bigint;
   status: "CONFIRMED" | "PENDING" | "REFUNDED" | "CHARGEBACK";
-  platform: "KIWIFY" | "HOTMART";
+  platform: "KIWIFY" | "HOTMART" | "EDUZZ" | "GENERIC";
   isAttributedToAds: boolean;
   adCampaignName?: string;
   createdAt: string;
@@ -81,6 +88,8 @@ export interface MockWhatsAppInstance {
   banRiskScore: number;
   dailySendCap: number;
   sentTodayCount: number;
+  proxy?: string;
+  lastActive?: string;
 }
 
 export interface MockLaunch {
@@ -235,6 +244,11 @@ class MockDataStore {
       timeEstimateMinutes: 60,
       timeSpentMinutes: 55,
       labels: ["Tracking", "CAPI", "Meta Ads"],
+      checklists: [
+        { id: "chk_1", title: "Validar snippet v3.0 em https://brunaoortiz.com.br", done: true },
+        { id: "chk_2", title: "Conferir envio de _fbp e _fbc nos eventos de compra", done: true },
+        { id: "chk_3", title: "Checar se EMQ atingiu 8.8+ no painel Meta Ads", done: true },
+      ],
     },
     {
       id: "tsk_2",
@@ -248,6 +262,11 @@ class MockDataStore {
       timeEstimateMinutes: 45,
       timeSpentMinutes: 20,
       labels: ["WhatsApp", "Warming"],
+      checklists: [
+        { id: "chk_4", title: "Ler QR Code da instância aqc_bruna_01", done: true },
+        { id: "chk_5", title: "Configurar pacing gaussiano (15s a 45s de delay)", done: true },
+        { id: "chk_6", title: "Ativar pausa preventiva caso o chip desconecte", done: false },
+      ],
     },
     {
       id: "tsk_3",
@@ -261,6 +280,11 @@ class MockDataStore {
       timeEstimateMinutes: 120,
       timeSpentMinutes: 0,
       labels: ["Vídeo AI", "Criativos"],
+      checklists: [
+        { id: "chk_7", title: "Subir 5 vídeos 4K brutos via upload em chunks", done: false },
+        { id: "chk_8", title: "Revisar cortes de silêncio no waveform", done: false },
+        { id: "chk_9", title: "Exportar reels 1080x1920 com karaoke cyan", done: false },
+      ],
     },
     {
       id: "tsk_4",
@@ -274,6 +298,11 @@ class MockDataStore {
       timeEstimateMinutes: 90,
       timeSpentMinutes: 0,
       labels: ["CRM", "Recuperação"],
+      checklists: [
+        { id: "chk_10", title: "Configurar webhook de carrinho abandonado Kiwify", done: true },
+        { id: "chk_11", title: "Aplicar janela de 24h anti-duplicação", done: true },
+        { id: "chk_12", title: "Disparar mensagem personalizada com cupom dinâmico", done: false },
+      ],
     },
     {
       id: "tsk_5",

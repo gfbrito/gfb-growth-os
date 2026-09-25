@@ -13,7 +13,7 @@ import {
   Sparkles
 } from 'lucide-react';
 
-export type ClientNavTab = 'dashboard' | 'reports' | 'crm' | 'whatsapp' | 'media';
+export type ClientNavTab = 'dashboard' | 'reports' | 'crm' | 'whatsapp' | 'media' | 'tasks';
 
 interface ClientSidebarProps {
   activeTab: ClientNavTab;
@@ -21,6 +21,7 @@ interface ClientSidebarProps {
   onSwitchToAgency?: () => void;
   isReceivingLeads?: boolean;
   onToggleReceivingLeads?: () => void;
+  userRole?: 'MASTER_AGENCY' | 'CLIENT_OWNER' | 'CLIENT_ATTENDANT';
 }
 
 export function ClientSidebar({
@@ -29,14 +30,22 @@ export function ClientSidebar({
   onSwitchToAgency,
   isReceivingLeads = true,
   onToggleReceivingLeads,
+  userRole = 'MASTER_AGENCY',
 }: ClientSidebarProps) {
-  const menuItems = [
+  const allMenuItems = [
     {
       id: 'dashboard' as ClientNavTab,
       label: 'DASHBOARD',
       desc: 'Certeza Executiva & Metas',
       icon: LayoutDashboard,
       badge: null,
+    },
+    {
+      id: 'tasks' as ClientNavTab,
+      label: 'MINI CLICKUP',
+      desc: 'Tarefas, Subtarefas & Sprint',
+      icon: Sparkles,
+      badge: 'Mini ClickUp',
     },
     {
       id: 'reports' as ClientNavTab,
@@ -58,18 +67,21 @@ export function ClientSidebar({
       label: 'WHATSAPP',
       desc: 'Grupos, Chat & Aquecedor',
       icon: MessageSquare,
-      badge: '26 Grupos',
-      sub: ['Grupos VIP', 'Chat Inbox', 'Aquecedor'],
+      badge: '26 GRP',
     },
     {
       id: 'media' as ClientNavTab,
-      label: 'MÍDIA',
+      label: 'ESTÚDIO DE MÍDIA',
       desc: 'Legenda 9:16 & Transcriber',
       icon: Video,
-      badge: 'IA',
-      sub: ['Legenda Rápida', 'Transcriber'],
+      badge: 'FFmpeg',
     },
   ];
+
+  const menuItems =
+    userRole === 'CLIENT_ATTENDANT'
+      ? allMenuItems.filter((i) => i.id === 'whatsapp')
+      : allMenuItems;
 
   return (
     <aside

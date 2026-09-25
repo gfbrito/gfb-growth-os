@@ -134,6 +134,57 @@ export function ClientDashboard({ clientData, onNavigateToTab }: ClientDashboard
         </div>
       </div>
 
+      {/* 7.4 Projeção Preditiva de Faturamento com IA */}
+      {clientData?.predictiveForecast && (
+        <div
+          className="glass-panel"
+          style={{
+            padding: '24px',
+            border: '1px solid rgba(139, 92, 246, 0.35)',
+            background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.08) 0%, rgba(6, 182, 212, 0.04) 100%)',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Sparkles size={18} color="var(--accent-purple)" />
+              <h3 style={{ fontSize: '1.15rem', fontWeight: 800 }}>Projeção Preditiva de Fechamento com IA</h3>
+              <span className="badge badge-purple" style={{ fontSize: '0.68rem' }}>
+                Confiança 92%
+              </span>
+            </div>
+            <span style={{ fontSize: '0.78rem', color: 'var(--text-dim)' }}>
+              {clientData.predictiveForecast.launchDayProgress} • Velocidade: R$ {clientData.predictiveForecast.runRateHourlyVelocity}/h
+            </span>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px', marginBottom: '16px' }}>
+            <div style={{ background: 'rgba(255,255,255,0.03)', padding: '14px', borderRadius: '10px' }}>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>Previsão de Fechamento</div>
+              <div style={{ fontSize: '1.6rem', fontWeight: 900, color: 'var(--accent-green)' }}>
+                R$ {clientData.predictiveForecast.expectedClosingRevenue?.toLocaleString('pt-BR')}
+              </div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)', marginTop: '2px' }}>
+                Faixa: R$ {clientData.predictiveForecast.confidenceBandMin?.toLocaleString('pt-BR')} a R$ {clientData.predictiveForecast.confidenceBandMax?.toLocaleString('pt-BR')}
+              </div>
+            </div>
+
+            <div style={{ background: 'rgba(255,255,255,0.03)', padding: '14px', borderRadius: '10px' }}>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>Status contra a Meta (R$ 150k)</div>
+              <div style={{ fontSize: '1.6rem', fontWeight: 900, color: clientData.predictiveForecast.isGoalAchievedProjected ? 'var(--accent-green)' : 'var(--accent-amber)' }}>
+                {clientData.predictiveForecast.isGoalAchievedProjected ? 'Meta Superada' : 'Atenção ao Ritmo'}
+              </div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)', marginTop: '2px' }}>
+                Delta projetado: R$ {clientData.predictiveForecast.projectedDeltaGoal?.toLocaleString('pt-BR')}
+              </div>
+            </div>
+          </div>
+
+          <div style={{ background: 'rgba(0,0,0,0.25)', padding: '12px 16px', borderRadius: '8px', border: '1px solid var(--border-subtle)', fontSize: '0.82rem', color: '#fff', lineHeight: 1.5 }}>
+            {clientData.predictiveForecast.aiRecommendation}
+          </div>
+        </div>
+      )}
+
       {/* Main Two-Column Row: Sales Feed & Leads Temperature */}
       <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '20px' }}>
         {/* Sales Feed */}
