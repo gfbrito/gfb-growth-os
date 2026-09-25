@@ -8,6 +8,8 @@ import { env } from "./config/env.js";
 import { logger } from "./utils/logger.js";
 import { prisma } from "./services/prisma.js";
 import { authRoutes } from "./modules/auth/auth.routes.js";
+import { trackingRoutes } from "./modules/tracking/tracking.routes.js";
+import { webhookRoutes } from "./modules/tracking/webhooks/webhook.routes.js";
 
 const app = express();
 const server = http.createServer(app);
@@ -114,6 +116,8 @@ app.get("/health", async (_req: Request, res: Response) => {
 
 // API Routes
 app.use("/api/auth", authRoutes);
+app.use(trackingRoutes);
+app.use(webhookRoutes);
 
 // Global Error Handler
 app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
