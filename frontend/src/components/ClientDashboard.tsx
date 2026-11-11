@@ -3,21 +3,23 @@ import {
   TrendingUp,
   DollarSign,
   Target,
-  Sparkles,
+  BarChart3,
   Flame,
   ArrowRight,
   ShieldCheck,
   CheckCircle,
   Radio,
-  Clock
+  Clock,
+  Layers,
 } from 'lucide-react';
 
 interface ClientDashboardProps {
   clientData: any;
-  onNavigateToTab: (tab: any) => void;
+  onNavigateToTab: (tab: any, subTab?: any) => void;
+  clientName?: string;
 }
 
-export function ClientDashboard({ clientData, onNavigateToTab }: ClientDashboardProps) {
+export function ClientDashboard({ clientData, onNavigateToTab, clientName = 'Cliente' }: ClientDashboardProps) {
   const summary = clientData?.executiveSummary || {
     todayRevenue: 8970,
     currentRevenue: 87400,
@@ -32,41 +34,40 @@ export function ClientDashboard({ clientData, onNavigateToTab }: ClientDashboard
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      {/* Executive Welcome & Certainty Banner */}
+      {/* Executive Welcome & Operations Status Header */}
       <div
         className="glass-panel"
         style={{
-          padding: '24px 30px',
-          background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(6, 182, 212, 0.08) 100%)',
-          border: '1px solid rgba(16, 185, 129, 0.3)',
-          boxShadow: '0 8px 32px rgba(16, 185, 129, 0.1)',
+          padding: '22px 28px',
+          background: 'var(--bg-surface-elevated)',
+          border: '1px solid var(--border-default)',
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-              <span className="badge badge-green" style={{ fontSize: '0.72rem' }}>
-                <CheckCircle size={12} />
-                CERTEZA DE RESULTADO
+              <span className="badge badge-green" style={{ fontSize: '0.7rem' }}>
+                <CheckCircle size={11} />
+                OPERAÇÃO ATIVA
               </span>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>
-                Atualizado em tempo real via CAPI Gateway
+                Meta CAPI v20 • Deduplicação Browser + Server
               </span>
             </div>
-            <h1 style={{ fontSize: '1.6rem', fontWeight: 800, margin: '4px 0', letterSpacing: '-0.02em' }}>
-              Olá, Bruna Ortiz! Aqui está o resultado da sua operação.
+            <h1 style={{ fontSize: '1.45rem', fontWeight: 700, margin: '4px 0', letterSpacing: '-0.02em', color: '#F8FAFC' }}>
+              Painel de Performance · {clientName}
             </h1>
-            <p style={{ fontSize: '0.92rem', color: 'var(--text-muted)' }}>
-              Operação em ritmo acelerado! Você está a <strong>112% da velocidade ideal</strong> para atingir a meta mensal de R$ 150.000.
+            <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)', margin: 0 }}>
+              Operação em ritmo acelerado com <strong>112% da velocidade programada</strong> para atingir a meta mensal.
             </p>
           </div>
-          <div style={{ textAlign: 'right', background: 'rgba(255,255,255,0.04)', padding: '12px 20px', borderRadius: '12px', border: '1px solid var(--border-subtle)' }}>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Velocidade Atual</div>
-            <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--accent-green)' }}>
+          <div style={{ textAlign: 'right', background: 'rgba(255,255,255,0.03)', padding: '10px 18px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Pacing de Faturamento</div>
+            <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--accent-green)', fontVariantNumeric: 'tabular-nums' }}>
               R$ {summary.currentDailyPace?.toLocaleString('pt-BR') || '3.496'}/dia
             </div>
-            <div style={{ fontSize: '0.7rem', color: 'var(--accent-cyan)', marginTop: '2px' }}>
-              Média móvel de 7 dias
+            <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+              Média móvel dos últimos 7 dias
             </div>
           </div>
         </div>
@@ -74,39 +75,39 @@ export function ClientDashboard({ clientData, onNavigateToTab }: ClientDashboard
 
       {/* 4 Big Numbers */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
-        <div className="glass-panel" style={{ padding: '22px' }}>
+        <div className="glass-panel" style={{ padding: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>FATURADO HOJE</span>
-            <DollarSign size={18} color="var(--accent-green)" />
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>FATURADO HOJE</span>
+            <DollarSign size={16} color="var(--accent-green)" />
           </div>
-          <div style={{ fontSize: '2.1rem', fontWeight: 800, color: 'var(--accent-green)', letterSpacing: '-0.02em' }}>
+          <div style={{ fontSize: '1.85rem', fontWeight: 800, color: 'var(--accent-green)', letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>
             R$ {summary.todayRevenue?.toLocaleString('pt-BR') || '8.970'},00
           </div>
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <div style={{ fontSize: '0.73rem', color: 'var(--text-dim)', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
             <TrendingUp size={13} color="var(--accent-green)" />
-            Vendas confirmadas no checkout Kiwify
+            Vendas confirmadas nos checkouts integrados
           </div>
         </div>
 
-        <div className="glass-panel" style={{ padding: '22px' }}>
+        <div className="glass-panel" style={{ padding: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>TOTAL ACUMULADO NO MÊS</span>
-            <Sparkles size={18} color="var(--accent-cyan)" />
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>TOTAL ACUMULADO NO MÊS</span>
+            <Layers size={16} color="var(--accent-cyan)" />
           </div>
-          <div style={{ fontSize: '2.1rem', fontWeight: 800, color: '#FFFFFF', letterSpacing: '-0.02em' }}>
+          <div style={{ fontSize: '1.85rem', fontWeight: 800, color: '#FFFFFF', letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>
             R$ {summary.currentRevenue?.toLocaleString('pt-BR') || '87.400'},00
           </div>
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '6px' }}>
+          <div style={{ fontSize: '0.73rem', color: 'var(--text-dim)', marginTop: '6px' }}>
             88 pedidos aprovados (Hotmart & Kiwify)
           </div>
         </div>
 
-        <div className="glass-panel" style={{ padding: '22px' }}>
+        <div className="glass-panel" style={{ padding: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>META DO MÊS</span>
-            <Target size={18} color="var(--accent-amber)" />
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>META DO MÊS</span>
+            <Target size={16} color="var(--accent-amber)" />
           </div>
-          <div style={{ fontSize: '2.1rem', fontWeight: 800, color: 'var(--accent-amber)', letterSpacing: '-0.02em' }}>
+          <div style={{ fontSize: '1.85rem', fontWeight: 800, color: 'var(--accent-amber)', letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>
             R$ {summary.revenueGoal?.toLocaleString('pt-BR') || '150.000'},00
           </div>
           <div style={{ marginTop: '8px' }}>
@@ -114,72 +115,73 @@ export function ClientDashboard({ clientData, onNavigateToTab }: ClientDashboard
               <span>{summary.progressPct || 58}% atingido</span>
               <span>Restam R$ 62.600</span>
             </div>
-            <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.08)', borderRadius: '3px', overflow: 'hidden' }}>
+            <div style={{ width: '100%', height: '5px', background: 'rgba(255,255,255,0.08)', borderRadius: '3px', overflow: 'hidden' }}>
               <div style={{ width: `${summary.progressPct || 58}%`, height: '100%', background: 'linear-gradient(90deg, #F59E0B, #10B981)' }} />
             </div>
           </div>
         </div>
 
-        <div className="glass-panel" style={{ padding: '22px' }}>
+        <div className="glass-panel" style={{ padding: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>RITMO NECESSÁRIO</span>
-            <Clock size={18} color="var(--accent-cyan)" />
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>RITMO DIÁRIO NECESSÁRIO</span>
+            <Clock size={16} color="var(--accent-cyan)" />
           </div>
-          <div style={{ fontSize: '2.1rem', fontWeight: 800, color: 'var(--accent-cyan)', letterSpacing: '-0.02em' }}>
+          <div style={{ fontSize: '1.85rem', fontWeight: 800, color: 'var(--accent-cyan)', letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>
             R$ {summary.requiredDailyPace?.toLocaleString('pt-BR') || '12.520'}/dia
           </div>
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '6px' }}>
-            Para fechar em 100% até o dia 30
+          <div style={{ fontSize: '0.73rem', color: 'var(--text-dim)', marginTop: '6px' }}>
+            Pacing para 100% de fechamento até o fim do ciclo
           </div>
         </div>
       </div>
 
-      {/* 7.4 Projeção Preditiva de Faturamento com IA */}
+      {/* Projeção Estatística de Fechamento (Run-Rate Gaussiano) */}
       {clientData?.predictiveForecast && (
         <div
           className="glass-panel"
           style={{
-            padding: '24px',
-            border: '1px solid rgba(139, 92, 246, 0.35)',
-            background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.08) 0%, rgba(6, 182, 212, 0.04) 100%)',
+            padding: '22px',
+            border: '1px solid var(--border-default)',
+            background: 'var(--bg-surface-elevated)',
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Sparkles size={18} color="var(--accent-purple)" />
-              <h3 style={{ fontSize: '1.15rem', fontWeight: 800 }}>Projeção Preditiva de Fechamento com IA</h3>
-              <span className="badge badge-purple" style={{ fontSize: '0.68rem' }}>
-                Confiança 92%
+              <TrendingUp size={17} color="var(--accent-cyan)" />
+              <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: '#F1F5F9' }}>Projeção de Fechamento (Curva de Lançamento)</h3>
+              <span className="badge badge-cyan" style={{ fontSize: '0.66rem' }}>
+                Intervalo 92%
               </span>
             </div>
-            <span style={{ fontSize: '0.78rem', color: 'var(--text-dim)' }}>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>
               {clientData.predictiveForecast.launchDayProgress} • Velocidade: R$ {clientData.predictiveForecast.runRateHourlyVelocity}/h
             </span>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px', marginBottom: '16px' }}>
-            <div style={{ background: 'rgba(255,255,255,0.03)', padding: '14px', borderRadius: '10px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px', marginBottom: '14px' }}>
+            <div style={{ background: 'rgba(255,255,255,0.02)', padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
               <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>Previsão de Fechamento</div>
-              <div style={{ fontSize: '1.6rem', fontWeight: 900, color: 'var(--accent-green)' }}>
+              <div style={{ fontSize: '1.45rem', fontWeight: 800, color: 'var(--accent-green)', fontVariantNumeric: 'tabular-nums' }}>
                 R$ {clientData.predictiveForecast.expectedClosingRevenue?.toLocaleString('pt-BR')}
               </div>
-              <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)', marginTop: '2px' }}>
+              <div style={{ fontSize: '0.68rem', color: 'var(--text-dim)', marginTop: '2px' }}>
                 Faixa: R$ {clientData.predictiveForecast.confidenceBandMin?.toLocaleString('pt-BR')} a R$ {clientData.predictiveForecast.confidenceBandMax?.toLocaleString('pt-BR')}
               </div>
             </div>
 
-            <div style={{ background: 'rgba(255,255,255,0.03)', padding: '14px', borderRadius: '10px' }}>
+            <div style={{ background: 'rgba(255,255,255,0.02)', padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
               <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>Status contra a Meta (R$ 150k)</div>
-              <div style={{ fontSize: '1.6rem', fontWeight: 900, color: clientData.predictiveForecast.isGoalAchievedProjected ? 'var(--accent-green)' : 'var(--accent-amber)' }}>
+              <div style={{ fontSize: '1.45rem', fontWeight: 800, color: clientData.predictiveForecast.isGoalAchievedProjected ? 'var(--accent-green)' : 'var(--accent-amber)' }}>
                 {clientData.predictiveForecast.isGoalAchievedProjected ? 'Meta Superada' : 'Atenção ao Ritmo'}
               </div>
-              <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)', marginTop: '2px' }}>
+              <div style={{ fontSize: '0.68rem', color: 'var(--text-dim)', marginTop: '2px' }}>
                 Delta projetado: R$ {clientData.predictiveForecast.projectedDeltaGoal?.toLocaleString('pt-BR')}
               </div>
             </div>
           </div>
 
-          <div style={{ background: 'rgba(0,0,0,0.25)', padding: '12px 16px', borderRadius: '8px', border: '1px solid var(--border-subtle)', fontSize: '0.82rem', color: '#fff', lineHeight: 1.5 }}>
+          <div style={{ background: '#070B13', padding: '12px 16px', borderRadius: '6px', border: '1px solid var(--border-subtle)', fontSize: '0.8rem', color: '#CBD5E1', lineHeight: 1.5 }}>
+            <span style={{ fontWeight: 600, color: 'var(--accent-cyan)', marginRight: '6px' }}>Diretriz Operacional:</span>
             {clientData.predictiveForecast.aiRecommendation}
           </div>
         </div>
@@ -195,7 +197,7 @@ export function ClientDashboard({ clientData, onNavigateToTab }: ClientDashboard
               Vendas Aprovadas em Tempo Real
             </h3>
             <button
-              onClick={() => onNavigateToTab('crm')}
+              onClick={() => onNavigateToTab('crm', 'sales')}
               className="btn btn-secondary"
               style={{ padding: '5px 10px', fontSize: '0.75rem' }}
             >

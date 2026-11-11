@@ -12,17 +12,20 @@ import {
   Download,
   FileText,
   FileSpreadsheet,
-  Sparkles,
   Printer,
 } from 'lucide-react';
 
-export function ClientReports() {
+interface ClientReportsProps {
+  clientId?: string;
+}
+
+export function ClientReports({ clientId = '' }: ClientReportsProps = {}) {
   const [downloadingFormat, setDownloadingFormat] = useState<string | null>(null);
 
   const funnelSteps = [
     { label: 'Cliques nos Anúncios Meta', value: '12.450', sub: 'Tráfego pago rastreado via CAPI v3.0', pct: '100%', color: 'var(--accent-cyan)' },
-    { label: 'Entradas no Grupo VIP WhatsApp', value: '4.766', sub: 'Leads que abriram o link /l/bruna-vip', pct: '38.2%', color: 'var(--accent-purple)' },
-    { label: 'Leads Retidos no Grupo', value: '4.258', sub: 'Aguardando abertura de carrinho', pct: '89.3%', color: 'var(--accent-green)' },
+    { label: 'Entradas no Grupo VIP WhatsApp', value: '4.766', sub: 'Leads que abriram o link inteligente', pct: '38.2%', color: 'var(--accent-purple)' },
+    { label: 'Leads Retidos no Grupo', value: '4.258', sub: 'Aguardando abertura de carrinho', pct: '89.4%', color: 'var(--accent-green)' },
     { label: 'Checkouts Iniciados (InitiateCheckout)', value: '342', sub: 'Com token s2/s3 de intenção', pct: '8.0%', color: 'var(--accent-amber)' },
     { label: 'Compras Confirmadas (Purchase)', value: '88', sub: 'Vendas aprovadas na Kiwify & Hotmart', pct: '25.7%', color: 'var(--accent-green)' },
   ];
@@ -46,15 +49,40 @@ export function ClientReports() {
 
   const maxVal = Math.max(...days.map((d) => d.in));
 
-  const handleExport = (format: 'pdf' | 'excel' | 'csv') => {
+  const handleExport = async (format: 'pdf' | 'excel' | 'csv') => {
     setDownloadingFormat(format);
-    const url = `/api/reports/export/${format}?clientId=cli_bruna_ppp`;
+    const url = `/api/reports/export/${format}?clientId=${clientId}`;
     if (format === 'pdf') {
       window.open(url, '_blank');
     } else {
       window.location.href = url;
     }
     setTimeout(() => setDownloadingFormat(null), 1500);
+
+    // Spec 10.2: Ao exportar um relatório, verificar ocorrência aberta de tarefa "Enviar relatório"
+    try {
+      const qUrl = clientId ? `/api/tasks?clientId=${clientId}` : '/api/tasks';
+      const tasksRes = await fetch(qUrl).then((r) => r.json());
+      const reportTask = tasksRes.tasks?.find(
+        (t: any) =>
+          t.status !== 'DONE' &&
+          (t.title.toLowerCase().includes('relatório') || t.title.toLowerCase().includes('enviar relatório'))
+      );
+      if (reportTask) {
+        const confirmComplete = window.confirm(
+          `Marcar a tarefa '${reportTask.title}' como concluída?`
+        );
+        if (confirmComplete) {
+          await fetch(`/api/tasks/${reportTask.id}/status`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'DONE' }),
+          });
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   return (
@@ -106,56 +134,56 @@ export function ClientReports() {
         </div>
       </div>
 
-      {/* 7.4 Projeção Preditiva de Faturamento com IA */}
+      {/* Projeção de Fechamento de Carrinho (Curva Gaussiana) */}
       <div
         className="glass-panel"
         style={{
-          padding: '24px',
-          border: '1px solid rgba(139, 92, 246, 0.35)',
-          background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.08) 0%, rgba(6, 182, 212, 0.04) 100%)',
+          padding: '22px',
+          border: '1px solid var(--border-default)',
+          background: 'var(--bg-surface-elevated)',
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Sparkles size={18} color="var(--accent-purple)" />
-            <h3 style={{ fontSize: '1.15rem', fontWeight: 800 }}>
-              Projeção Preditiva com IA: Fechamento de Lançamento
+            <TrendingUp size={18} color="var(--accent-cyan)" />
+            <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: '#F1F5F9' }}>
+              Projeção de Fechamento de Carrinho (Curva de Lançamento)
             </h3>
-            <span className="badge badge-purple">Confiança Estatística: 92%</span>
+            <span className="badge badge-cyan">Confiança Estatística: 92%</span>
           </div>
-          <span style={{ fontSize: '0.78rem', color: 'var(--text-dim)' }}>
-            Curva de Lançamento (D1: 35% • D2: 15% • D3: 10% • D4: 8% • D5-D7: 32%)
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>
+            Curva Gaussiana (D1: 35% • D2: 15% • D3: 10% • D4: 8% • D5-D7: 32%)
           </span>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px', marginBottom: '16px' }}>
-          <div style={{ background: 'rgba(255,255,255,0.03)', padding: '14px', borderRadius: '10px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '14px' }}>
+          <div style={{ background: 'rgba(255,255,255,0.02)', padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
             <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>Faturamento Atual</div>
-            <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#fff' }}>R$ 87.400</div>
+            <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>R$ 87.400</div>
             <div style={{ fontSize: '0.68rem', color: 'var(--accent-cyan)', marginTop: '2px' }}>Dia 4 de 7 aberto</div>
           </div>
 
-          <div style={{ background: 'rgba(255,255,255,0.03)', padding: '14px', borderRadius: '10px' }}>
-            <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>Projeção Preditiva Final</div>
-            <div style={{ fontSize: '1.5rem', fontWeight: 900, color: 'var(--accent-green)' }}>R$ 158.400</div>
+          <div style={{ background: 'rgba(255,255,255,0.02)', padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>Projeção Final Estimada</div>
+            <div style={{ fontSize: '1.45rem', fontWeight: 800, color: 'var(--accent-green)', fontVariantNumeric: 'tabular-nums' }}>R$ 158.400</div>
             <div style={{ fontSize: '0.68rem', color: 'var(--text-dim)', marginTop: '2px' }}>Faixa: R$ 142k a R$ 168k</div>
           </div>
 
-          <div style={{ background: 'rgba(255,255,255,0.03)', padding: '14px', borderRadius: '10px' }}>
+          <div style={{ background: 'rgba(255,255,255,0.02)', padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
             <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>Meta Estabelecida</div>
-            <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--accent-amber)' }}>R$ 150.000</div>
+            <div style={{ fontSize: '1.45rem', fontWeight: 800, color: 'var(--accent-amber)', fontVariantNumeric: 'tabular-nums' }}>R$ 150.000</div>
             <div style={{ fontSize: '0.68rem', color: 'var(--accent-green)', marginTop: '2px' }}>+5.6% acima da meta</div>
           </div>
 
-          <div style={{ background: 'rgba(255,255,255,0.03)', padding: '14px', borderRadius: '10px' }}>
+          <div style={{ background: 'rgba(255,255,255,0.02)', padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
             <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>Velocidade Horária</div>
-            <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--accent-cyan)' }}>R$ 640/h</div>
+            <div style={{ fontSize: '1.45rem', fontWeight: 800, color: 'var(--accent-cyan)', fontVariantNumeric: 'tabular-nums' }}>R$ 640/h</div>
             <div style={{ fontSize: '0.68rem', color: 'var(--text-dim)', marginTop: '2px' }}>Média das últimas 24h</div>
           </div>
         </div>
 
-        <div style={{ background: 'rgba(0,0,0,0.25)', padding: '12px 16px', borderRadius: '8px', border: '1px solid var(--border-subtle)', fontSize: '0.82rem', color: '#fff', lineHeight: 1.5 }}>
-          💡 <strong>Recomendação da IA:</strong> Com a taxa de conversão atual de 4.8% nos grupos VIP e retenção de 89.3%, a projeção fecha em R$ 158.400, superando a meta. Recomendamos aumentar o orçamento nos conjuntos de lookalike de compradores e ativar o disparo de recuperação de PIX pendente para resgatar ~R$ 18.000 antes do encerramento.
+        <div style={{ background: '#070B13', padding: '12px 16px', borderRadius: '6px', border: '1px solid var(--border-subtle)', fontSize: '0.8rem', color: '#CBD5E1', lineHeight: 1.5 }}>
+          <span style={{ fontWeight: 600, color: 'var(--accent-cyan)', marginRight: '6px' }}>Diretriz Tática de Tráfego:</span> Com a taxa de conversão atual de 4.8% nos grupos VIP e retenção de 89.4%, a projeção fecha em R$ 158.400, superando a meta. Recomendamos aumentar o orçamento nos conjuntos de lookalike de compradores e ativar o disparo de recuperação de PIX pendente para resgatar ~R$ 18.000 antes do encerramento.
         </div>
       </div>
 
@@ -257,7 +285,7 @@ export function ClientReports() {
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px', fontSize: '0.8rem', color: 'var(--text-dim)' }}>
-          <span>Taxa de Retenção Acumulada: <strong style={{ color: 'var(--accent-green)' }}>89.3%</strong></span>
+          <span>Taxa de Retenção Acumulada: <strong style={{ color: 'var(--accent-green)' }}>89.4%</strong></span>
           <span>Total de Entradas: <strong style={{ color: '#fff' }}>4.766 membros</strong></span>
           <span>Total de Saídas: <strong style={{ color: 'var(--accent-rose)' }}>508 saídas</strong></span>
         </div>

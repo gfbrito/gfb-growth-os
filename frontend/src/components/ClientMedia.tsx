@@ -401,8 +401,8 @@ export function ClientMedia() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>Oradores Registrados (PyAnnote Voiceprints):</span>
               <span className="badge badge-green" style={{ fontSize: '0.68rem' }}>🎙️ Gisley Fernandes (98%)</span>
-              <span className="badge badge-purple" style={{ fontSize: '0.68rem' }}>🎙️ Bruna Ortiz (96%)</span>
-              <span className="badge badge-cyan" style={{ fontSize: '0.68rem' }}>🎙️ Arthur Gestor (94%)</span>
+              <span className="badge badge-purple" style={{ fontSize: '0.68rem' }}>🎙️ Especialista (96%)</span>
+              <span className="badge badge-cyan" style={{ fontSize: '0.68rem' }}>🎙️ Gestor de Contas (94%)</span>
               <span className="badge" style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#EF4444', fontSize: '0.68rem' }}>
                 🛡️ Rejeição de Ruído Ativa
               </span>
@@ -430,10 +430,10 @@ export function ClientMedia() {
               </div>
 
               <div style={{ color: 'var(--accent-purple)', fontWeight: 700 }}>
-                [00:12:44] Bruna Ortiz (Confiança: 96%):
+                [00:12:44] Especialista (Confiança: 96%):
               </div>
               <div style={{ color: '#fff', marginBottom: '12px' }}>
-                "Excelente. Os grupos do WhatsApp já estão recebendo leads pelo link /l/bruna-vip sem nenhum travamento."
+                "Excelente. Os grupos do WhatsApp já estão recebendo leads pelo link inteligente sem nenhum travamento."
               </div>
 
               <div style={{ color: 'var(--accent-amber)', fontWeight: 700 }}>

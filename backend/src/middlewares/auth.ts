@@ -9,7 +9,11 @@ export interface AuthenticatedUser {
   email: string;
   name: string;
   role: UserRole;
+  growthRole?: string;
   organizationId?: string;
+  clientId?: string;
+  clientName?: string;
+  clientSlug?: string;
 }
 
 declare global {

@@ -1,153 +1,224 @@
-/**
- * GFB Growth OS — Roteador Dinâmico de Lançamentos & Grupos VIP
- * Balanceamento de carga, auto-criação de grupos ao atingir 95% de capacidade,
- * registro de cliques UTM e enriquecimento do Identity Graph.
- */
-
-import { mockDb, MockLaunchGroupItem } from "./mockDb.js";
-import { identityService } from "./identityService.js";
+import { mockDb, MockLaunch, MockLaunchGroup, MockLaunchClick, MockLaunchParticipant } from "./mockDb.js";
 import { logger } from "../utils/logger.js";
 
-export interface RoutingResult {
-  targetUrl: string;
-  groupName: string;
-  groupNumber: number;
-  occupancyPct: number;
-  isNewGroupCreated: boolean;
-  leadId?: string;
+export type RouteResultType = "NOT_FOUND" | "PAUSED" | "REDIRECT";
+
+export interface RouteLaunchResult {
+  type: RouteResultType;
+  launch?: MockLaunch;
+  targetGroup?: MockLaunchGroup;
+  targetUrl?: string;
+  visitorId?: string;
+  metaPixelId?: string | null;
+  gtmContainerId?: string | null;
 }
 
 class LaunchRouterService {
   /**
-   * Roteamento Dinâmico Inteligente para /l/:slug
+   * Roteamento Dinâmico para /l/:slug (spec 12.7)
    */
   public routeVisitor(params: {
     slug: string;
+    visitorId?: string;
     ipAddress?: string;
     userAgent?: string;
     utms?: Record<string, string>;
-  }): RoutingResult | null {
+  }): RouteLaunchResult {
     const launch = mockDb.launches.find((l) => l.slug === params.slug);
-    if (!launch) return null;
-
-    // Buscar grupos pertencentes ao lançamento
-    let groups = mockDb.launchGroups.filter((g) => g.launchId === launch.id);
-
-    // Encontrar grupo ativo que esteja recebendo e com vaga (< 95% de ocupação)
-    let targetGroup = groups.find(
-      (g) => g.status === "RECEIVING" && g.memberCount / g.maxMembers < 0.95
-    );
-
-    let isNewGroupCreated = false;
-
-    // Se todos os grupos ativos estiverem >= 95% cheios, criar automaticamente o próximo grupo VIP
-    if (!targetGroup) {
-      const nextNumber = groups.length + 1;
-      targetGroup = {
-        id: `grp_auto_${Date.now()}`,
-        launchId: launch.id,
-        name: `Bruna Ortiz - Grupo VIP #${String(nextNumber).padStart(2, "0")}`,
-        number: nextNumber,
-        memberCount: 1, // apenas o bot admin
-        maxMembers: 1024,
-        status: "RECEIVING",
-        inviteUrl: `https://chat.whatsapp.com/auto_invite_vip_${nextNumber}`,
-      };
-
-      // Inserir no banco de dados / mock store
-      mockDb.launchGroups.push(targetGroup);
-      launch.groupCount = nextNumber;
-      isNewGroupCreated = true;
-
-      logger.info(
-        { launch: launch.slug, newGroup: targetGroup.name, number: nextNumber },
-        "LaunchRouter: Auto-criação autônoma de novo Grupo VIP disparada (95% de lotação atingida)"
-      );
+    if (!launch) {
+      return { type: "NOT_FOUND" };
     }
 
-    // Registrar Lead ou Clique no Identity Graph
-    const lead = identityService.resolveOrCreateLead({
-      clientId: launch.clientId,
-      ip: params.ipAddress,
-      userAgent: params.userAgent,
-      utms: params.utms,
-      sourceTag: `Link Rotativo /l/${params.slug}`,
-    });
+    // Regra 2: DRAFT, PAUSED ou CLOSED mostra aviso de inscrições pausadas sem registrar clique
+    if (launch.status !== "ACTIVE") {
+      return {
+        type: "PAUSED",
+        launch,
+      };
+    }
 
-    identityService.addTimelineEvent({
-      leadId: lead.id,
-      clientId: launch.clientId,
-      type: "AD_CLICK",
-      title: `Clique no Link VIP: /l/${params.slug}`,
-      description: `Roteado para ${targetGroup.name} (${Math.round((targetGroup.memberCount / targetGroup.maxMembers) * 100)}% de ocupação).`,
-      channel: "META_ADS",
-      metadata: {
-        slug: params.slug,
-        targetGroup: targetGroup.name,
-        utms: params.utms,
-      },
-      timestamp: new Date().toISOString(),
-    });
+    // Regra 3 e 4: Escolha do grupo ativo
+    const allGroups = mockDb.launchGroups.filter((g) => g.launchId === launch.id);
+    const memberLimit = launch.memberLimitPerGroup || 1000;
+
+    // Grupos com status = RECEIVING e abaixo do limite de membros
+    const availableGroups = allGroups.filter(
+      (g) => g.status === "RECEIVING" && g.memberCount < memberLimit
+    );
+
+    let targetGroup: MockLaunchGroup | undefined;
+
+    if (availableGroups.length > 0) {
+      if (launch.fillOrder === "SEQUENTIAL") {
+        // SEQUENTIAL: o de menor position
+        availableGroups.sort((a, b) => a.position - b.position);
+        targetGroup = availableGroups[0];
+      } else {
+        // PROPORTIONAL: o de menor memberCount; empate, menor position
+        availableGroups.sort((a, b) => {
+          if (a.memberCount !== b.memberCount) {
+            return a.memberCount - b.memberCount;
+          }
+          return a.position - b.position;
+        });
+        targetGroup = availableGroups[0];
+      }
+    } else {
+      // Regra 5: Nenhum grupo com vaga
+      if (launch.autoCreateEnabled) {
+        // Põe um grupo na fila de criação se não houver um na fila
+        const hasPending = mockDb.launchCreationQueue.some(
+          (q) => q.launchId === launch.id && (q.status === "PENDING" || q.status === "CREATING")
+        );
+        if (!hasPending) {
+          const nextNum = allGroups.length + 1;
+          mockDb.launchCreationQueue.push({
+            id: `que_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`,
+            launchId: launch.id,
+            groupNumber: nextNum,
+            status: "PENDING",
+            createdAt: new Date().toISOString(),
+          });
+          logger.info({ launchId: launch.id }, "Novo grupo adicionado à fila de criação automática.");
+        }
+      }
+
+      // Redireciona para o grupo não pausado de menor memberCount
+      const nonPaused = allGroups.filter((g) => g.status !== "PAUSED");
+      if (nonPaused.length > 0) {
+        nonPaused.sort((a, b) => a.memberCount - b.memberCount || a.position - b.position);
+        targetGroup = nonPaused[0];
+      } else {
+        // Se não houver nenhum grupo não pausado, mostra página de aviso
+        return {
+          type: "PAUSED",
+          launch,
+        };
+      }
+    }
+
+    // Regra 3: Registra o clique para ACTIVE
+    const visitorId = params.visitorId || `vis_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+    const newClick: MockLaunchClick = {
+      id: `clk_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      launchId: launch.id,
+      visitorId,
+      utmSource: params.utms?.utm_source || undefined,
+      utmMedium: params.utms?.utm_medium || undefined,
+      utmCampaign: params.utms?.utm_campaign || undefined,
+      assignedGroupId: targetGroup?.id,
+      createdAt: new Date().toISOString(),
+    };
+    mockDb.launchClicks.push(newClick);
 
     return {
-      targetUrl: targetGroup.inviteUrl,
-      groupName: targetGroup.name,
-      groupNumber: targetGroup.number,
-      occupancyPct: Math.round((targetGroup.memberCount / targetGroup.maxMembers) * 100),
-      isNewGroupCreated,
-      leadId: lead.id,
+      type: "REDIRECT",
+      launch,
+      targetGroup,
+      targetUrl: targetGroup?.inviteUrl,
+      visitorId,
+      metaPixelId: launch.metaPixelId,
+      gtmContainerId: launch.gtmContainerId,
     };
   }
 
   /**
-   * Monitor de Entradas e Saídas via Webhook do WhatsApp (Evolution API)
+   * Monitor de Entradas e Saídas de Grupos
    */
-  public handleParticipantUpdate(params: {
-    groupNumber: number;
+  public handleParticipantEvent(params: {
+    launchId: string;
+    groupId: string;
     participantPhone: string;
-    action: "add" | "remove";
+    action: "JOIN" | "LEAVE";
   }) {
-    const group = mockDb.launchGroups.find((g) => g.number === params.groupNumber);
-    const lead = identityService.resolveOrCreateLead({
-      clientId: "cli_bruna_ppp",
-      phone: params.participantPhone,
-      sourceTag: `Grupo VIP #${params.groupNumber}`,
-    });
+    const { launchId, groupId, participantPhone, action } = params;
+    const now = new Date().toISOString();
 
-    if (params.action === "add") {
-      lead.rfmPoints += 15;
-      lead.temperature = lead.temperature === "COLD" ? "WARM" : lead.temperature;
-      if (group && group.memberCount < group.maxMembers) {
+    let participant = mockDb.launchParticipants.find(
+      (p) => p.launchId === launchId && p.phone === participantPhone
+    );
+
+    const group = mockDb.launchGroups.find((g) => g.id === groupId);
+
+    if (action === "JOIN") {
+      if (group) {
         group.memberCount += 1;
+        if (group.memberCount >= group.maxMembers && group.status === "RECEIVING") {
+          group.status = "FULL";
+        }
       }
 
-      identityService.addTimelineEvent({
-        leadId: lead.id,
-        clientId: "cli_bruna_ppp",
-        type: "VIP_GROUP_JOIN",
-        title: `Entrou no Grupo VIP #${params.groupNumber}`,
-        description: `Lead ingressou no grupo. +15 pontos RFM adicionados.`,
-        channel: "WPP_GRUPOS",
-        timestamp: new Date().toISOString(),
-      });
-    } else if (params.action === "remove") {
-      lead.rfmPoints = Math.max(0, lead.rfmPoints - 10);
+      if (participant) {
+        if (!participant.groupIds.includes(groupId)) {
+          participant.groupIds.push(groupId);
+        }
+        participant.status = "ACTIVE";
+        participant.engagementScore += 15; // spec 13.3: Entrou no grupo +15
+        if (participant.engagementScore >= 60) participant.classification = "HOT";
+        else if (participant.engagementScore >= 30) participant.classification = "WARM";
+        else participant.classification = "COOL";
+      } else {
+        // Enriquecimento com CRM se o lead já existir
+        const crmLead = mockDb.leads.find((l) => l.phone === participantPhone);
+        participant = {
+          id: `prt_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+          launchId,
+          phone: participantPhone,
+          name: crmLead?.name || null,
+          crmLeadId: crmLead?.id || null,
+          groupIds: [groupId],
+          status: "ACTIVE",
+          engagementScore: 15,
+          classification: "COOL",
+          joinedAt: now,
+          leftAt: null,
+        };
+        mockDb.launchParticipants.push(participant);
+      }
+    } else if (action === "LEAVE") {
       if (group && group.memberCount > 0) {
         group.memberCount -= 1;
+        if (group.status === "FULL" && group.memberCount < group.maxMembers) {
+          group.status = "RECEIVING";
+        }
       }
 
-      identityService.addTimelineEvent({
-        leadId: lead.id,
-        clientId: "cli_bruna_ppp",
-        type: "VIP_GROUP_LEAVE",
-        title: `Saiu do Grupo VIP #${params.groupNumber}`,
-        description: `Lead deixou o grupo. -10 pontos RFM descontados.`,
-        channel: "WPP_GRUPOS",
-        timestamp: new Date().toISOString(),
-      });
+      if (participant) {
+        participant.groupIds = participant.groupIds.filter((gid) => gid !== groupId);
+        if (participant.groupIds.length === 0) {
+          participant.status = "LEFT";
+          participant.leftAt = now;
+          participant.engagementScore = 0; // spec 13.3: Saiu do grupo zera
+          participant.classification = "COLD";
+        }
+      }
     }
 
-    return { lead, group };
+    // Auto-criação automática pós-entrada (spec 13.2)
+    const launch = mockDb.launches.find((l) => l.id === launchId);
+    if (launch && launch.autoCreateEnabled && action === "JOIN") {
+      const nonPaused = mockDb.launchGroups.filter((g) => g.launchId === launchId && g.status !== "PAUSED");
+      const totalMembers = nonPaused.reduce((sum, g) => sum + g.memberCount, 0);
+      const totalCapacity = nonPaused.reduce((sum, g) => sum + g.maxMembers, 0);
+
+      if (totalCapacity > 0) {
+        const occupancyPct = (totalMembers / totalCapacity) * 100;
+        if (occupancyPct >= launch.autoCreateThresholdPercent) {
+          const hasPending = mockDb.launchCreationQueue.some(
+            (q) => q.launchId === launchId && (q.status === "PENDING" || q.status === "CREATING")
+          );
+          if (!hasPending) {
+            mockDb.launchCreationQueue.push({
+              id: `que_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`,
+              launchId,
+              groupNumber: mockDb.launchGroups.filter((g) => g.launchId === launchId).length + 1,
+              status: "PENDING",
+              createdAt: now,
+            });
+          }
+        }
+      }
+    }
   }
 }
 

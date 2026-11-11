@@ -22,6 +22,8 @@ export function authUserMiddleware(req: Request, res: Response, next: NextFuncti
   else if (roleHeader === "AGENCY_OPERATOR") prismaRole = UserRole.GESTOR;
   else prismaRole = UserRole.SUPER_ADMIN;
 
+  const isClientUser = roleHeader === "CLIENT_ATTENDANT" || roleHeader === "CLIENT_OWNER";
+
   const user: AuthenticatedUser & { growthRole: GrowthOsRole } = {
     id: roleHeader === "CLIENT_ATTENDANT" ? "usr_attendant_01" : "usr_gisley",
     name:
@@ -37,6 +39,9 @@ export function authUserMiddleware(req: Request, res: Response, next: NextFuncti
     role: prismaRole,
     growthRole: (roleHeader as GrowthOsRole) || "MASTER_AGENCY",
     organizationId: "org_gfb_digital",
+    clientId: (req.headers["x-client-id"] as string) || (isClientUser ? "cli_bruna_ppp" : undefined),
+    clientName: isClientUser ? "Bruna Ortiz - PPP" : undefined,
+    clientSlug: isClientUser ? "brunaortiz_ppp" : undefined,
   };
 
   req.user = user;

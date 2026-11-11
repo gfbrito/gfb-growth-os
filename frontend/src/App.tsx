@@ -1,297 +1,330 @@
 import React, { useState, useEffect } from 'react';
 import {
-  LayoutDashboard,
   TrendingUp,
-  DollarSign,
-  Radio,
-  MessageSquare,
-  ShieldCheck,
-  Sparkles
+  LayoutDashboard,
+  ArrowLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { AlertBanner } from './components/AlertBanner';
+import { ClientList } from './components/ClientList';
+import { ClientRegistration } from './components/ClientRegistration';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { ClientSidebar, type ClientNavTab } from './components/ClientSidebar';
+import { OrganicPanel } from './components/organic/OrganicPanel';
 import { ClientDashboard } from './components/ClientDashboard';
 import { ClientReports } from './components/ClientReports';
 import { ClientCrm } from './components/ClientCrm';
 import { ClientWhatsApp } from './components/ClientWhatsApp';
 import { ClientMedia } from './components/ClientMedia';
 import { ClientMiniClickUp } from './components/ClientMiniClickUp';
-import { AgencyPortal } from './components/AgencyPortal';
+import type { CrmSubTab, WhatsAppSubTab } from './types/crm';
+
+type AgencyView = 'clients' | 'new-client' | 'edit-client' | 'client-portal';
 
 export function App() {
-  const [activePortal, setActivePortal] = useState<'agency' | 'client'>('client');
-  const [clientTab, setClientTab] = useState<ClientNavTab>('dashboard');
   const [userRole, setUserRole] = useState<'MASTER_AGENCY' | 'CLIENT_OWNER' | 'CLIENT_ATTENDANT'>('MASTER_AGENCY');
+  const [agencyView, setAgencyView] = useState<AgencyView>('client-portal');
+  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
+  const [activeClient, setActiveClient] = useState<any>(null);
+
+  // Client Portal Tabs
+  const [clientTab, setClientTab] = useState<ClientNavTab>('organic');
+  const [crmSubTab, setCrmSubTab] = useState<CrmSubTab>('leads');
+  const [whatsappSubTab, setWhatsappSubTab] = useState<WhatsAppSubTab>('groups');
+
+  // Load clients on initial mount
+  useEffect(() => {
+    fetch('/api/clients')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => {
+        const list = Array.isArray(data) ? data : (data.clients || []);
+        if (list.length > 0 && !activeClient) {
+          const defaultClient = list.find((c: any) => c.slug?.includes('ar-advocacia')) || list[0];
+          setActiveClient(defaultClient);
+        }
+      })
+      .catch((err) => console.error('Error fetching clients:', err));
+  }, []);
 
   const handleRoleChange = (role: 'MASTER_AGENCY' | 'CLIENT_OWNER' | 'CLIENT_ATTENDANT') => {
     setUserRole(role);
-    if (role === 'CLIENT_ATTENDANT') {
-      setActivePortal('client');
-      setClientTab('whatsapp');
-    } else if (role === 'CLIENT_OWNER') {
-      setActivePortal('client');
-      setClientTab('dashboard');
-    } else {
-      setActivePortal('agency');
-    }
   };
 
-  // Agency data state
-  const [agencyData, setAgencyData] = useState<any>(null);
-  const [clientData, setClientData] = useState<any>(null);
-  const [tasks, setTasks] = useState<any[]>([]);
-  const [isReceivingLeads, setIsReceivingLeads] = useState(true);
-
-  // Fetch initial mock/API data
-  useEffect(() => {
-    fetch('/api/dashboard/agency')
-      .then((res) => res.json())
-      .then((data) => setAgencyData(data))
-      .catch((err) => console.error('Error fetching agency dashboard:', err));
-
-    fetch('/api/dashboard/client/cli_bruna_ppp')
-      .then((res) => res.json())
-      .then((data) => setClientData(data))
-      .catch((err) => console.error('Error fetching client dashboard:', err));
-
-    fetch('/api/tasks')
-      .then((res) => res.json())
-      .then((data) => setTasks(data.tasks || []))
-      .catch((err) => console.error('Error fetching tasks:', err));
-  }, []);
-
-  const handleCreateTask = (title: string, priority: string) => {
-    const newTask = {
-      id: `tsk_${Date.now()}`,
-      title,
-      status: 'TODO',
-      priority,
-      clientName: 'Bruna Ortiz - PPP',
-      assigneeName: 'Arthur Gestor',
-      assigneeAvatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Arthur',
-      timeEstimateMinutes: 60,
-      labels: ['Novo'],
-    };
-
-    setTasks([newTask, ...tasks]);
+  const handleClientSaved = () => {
+    fetch('/api/clients')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => {
+        const list = Array.isArray(data) ? data : (data.clients || []);
+        if (list.length > 0) {
+          setActiveClient(list[0]);
+        }
+        setAgencyView('clients');
+      });
   };
 
-  const handleMoveTask = (taskId: string, newStatus: string) => {
-    setTasks(tasks.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t)));
-    fetch(`/api/tasks/${taskId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: newStatus }),
-    }).catch((err) => console.error(err));
+  const handleOpenClientPortal = (client: any, tab: ClientNavTab = 'organic') => {
+    fetch(`/api/clients/${client.id}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        setActiveClient(d?.client || client);
+        setClientTab(tab);
+        setAgencyView('client-portal');
+      })
+      .catch(() => {
+        setActiveClient(client);
+        setClientTab(tab);
+        setAgencyView('client-portal');
+      });
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      {/* Top Disconnected Chip Alert Banner (padrão aquecedor) */}
-      <AlertBanner
-        onResolve={() => {
-          setActivePortal('client');
-          setClientTab('whatsapp');
-        }}
-      />
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg-canvas)' }}>
+      {/* Top Alert Banner */}
+      <AlertBanner onResolve={() => {}} />
 
-      {/* Global Top Navbar */}
+      {/* Global Top Navbar (Dark GFB Theme) */}
       <header
         style={{
           borderBottom: '1px solid var(--border-subtle)',
-          background: 'rgba(8, 12, 21, 0.95)',
-          backdropFilter: 'blur(20px)',
+          background: 'rgba(9, 13, 20, 0.95)',
+          backdropFilter: 'blur(12px)',
           position: 'sticky',
           top: 0,
           zIndex: 50,
-          padding: '12px 24px',
+          padding: '10px 24px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          {/* Logo Mark */}
+          <div
+            onClick={() => setAgencyView('clients')}
+            style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}
+          >
             <div
               style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: '10px',
-                background: 'linear-gradient(135deg, #10B981, #06B6D4)',
+                width: '32px',
+                height: '32px',
+                borderRadius: '8px',
+                background: '#0F1626',
+                border: '1px solid rgba(16, 185, 129, 0.4)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 0 16px rgba(16, 185, 129, 0.4)',
+                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.4)',
               }}
             >
-              <TrendingUp size={20} color="#fff" />
+              <TrendingUp size={17} color="var(--accent-green)" />
             </div>
             <div>
-              <div style={{ fontWeight: 800, fontSize: '1.1rem', letterSpacing: '-0.02em' }}>
-                GFB <span style={{ color: 'var(--accent-green)' }}>GROWTH OS</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ fontWeight: 800, fontSize: '0.98rem', letterSpacing: '-0.02em', color: '#fff' }}>
+                  GFB <span style={{ color: 'var(--accent-green)' }}>GROWTH OS</span>
+                </span>
+                <span className="badge" style={{ fontSize: '0.62rem', padding: '1px 5px', color: 'var(--text-dim)', background: 'rgba(255,255,255,0.04)' }}>
+                  v2.4
+                </span>
               </div>
-              <div style={{ fontSize: '0.68rem', color: 'var(--text-dim)', letterSpacing: '0.04em' }}>
-                ALL-IN-ONE TRAFFIC, TRACKING & CRM
+              <div style={{ fontSize: '0.65rem', color: 'var(--text-dim)', letterSpacing: '0.04em', fontWeight: 500 }}>
+                TRAFFIC · CAPI GATEWAY · CRM · ORGANIC
               </div>
             </div>
           </div>
 
-          <div style={{ height: '24px', width: '1px', background: 'var(--border-subtle)' }} />
+          <div style={{ height: '20px', width: '1px', background: 'var(--border-subtle)' }} />
 
-          {/* Dual View Toggle Switcher (Hidden in Attendant mode) */}
-          {userRole !== 'CLIENT_ATTENDANT' && (
+          {/* Active Section Indicator & Breadcrumbs */}
+          {agencyView === 'client-portal' && activeClient ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <button
+                onClick={() => setAgencyView('clients')}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  color: '#94A3B8',
+                  borderRadius: '6px',
+                  padding: '4px 10px',
+                  fontSize: '0.74rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                <ArrowLeft size={13} />
+                Clientes
+              </button>
+              <ChevronRight size={13} color="#64748B" />
+              <span style={{ fontWeight: 700, fontSize: '0.82rem', color: '#F1F5F9' }}>
+                {activeClient.tradeName || activeClient.name}
+              </span>
+              <ChevronRight size={13} color="#64748B" />
+              <span
+                style={{
+                  fontSize: '0.74rem',
+                  fontWeight: 700,
+                  color: clientTab === 'organic' ? '#F472B6' : 'var(--accent-cyan)',
+                  background: clientTab === 'organic' ? 'rgba(244, 114, 182, 0.15)' : 'rgba(56, 189, 248, 0.12)',
+                  padding: '2px 8px',
+                  borderRadius: '4px',
+                }}
+              >
+                {clientTab === 'organic' ? 'ORGÂNICO (INSTAGRAM)' : clientTab.toUpperCase()}
+              </span>
+            </div>
+          ) : (
             <div
               style={{
                 display: 'flex',
-                background: 'rgba(255, 255, 255, 0.05)',
-                padding: '4px',
-                borderRadius: '12px',
-                border: '1px solid var(--border-subtle)',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '5px 14px',
+                background: 'rgba(14, 165, 233, 0.08)',
+                border: '1px solid rgba(14, 165, 233, 0.2)',
+                borderRadius: '6px',
               }}
             >
-              <button
-                onClick={() => setActivePortal('client')}
-                style={{
-                  padding: '6px 14px',
-                  borderRadius: '8px',
-                  fontSize: '0.8rem',
-                  fontWeight: 600,
-                  border: 'none',
-                  cursor: 'pointer',
-                  background: activePortal === 'client' ? 'var(--accent-cyan)' : 'transparent',
-                  color: activePortal === 'client' ? '#080C15' : 'var(--text-muted)',
-                  transition: 'all 0.2s',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                }}
-              >
-                <DollarSign size={14} />
-                Painel do Cliente (Bruna Ortiz)
-              </button>
-              <button
-                onClick={() => setActivePortal('agency')}
-                style={{
-                  padding: '6px 14px',
-                  borderRadius: '8px',
-                  fontSize: '0.8rem',
-                  fontWeight: 600,
-                  border: 'none',
-                  cursor: 'pointer',
-                  background: activePortal === 'agency' ? 'var(--accent-green)' : 'transparent',
-                  color: activePortal === 'agency' ? '#fff' : 'var(--text-muted)',
-                  transition: 'all 0.2s',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                }}
-              >
-                <LayoutDashboard size={14} />
-                Portal da Agência (GFB Master)
-              </button>
+              <LayoutDashboard size={14} color="#0EA5E9" />
+              <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#F8FAFC' }}>
+                Portal da Agência · Carteira de Clientes
+              </span>
             </div>
           )}
         </div>
 
-        {/* Right Status Badges & RBAC Role Switcher */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div className="badge badge-green">
-            <Radio size={12} className="animate-pulse" />
-            CAPI 9/9 (EMQ 8.8)
+        {/* Right Status & Profile */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div className="badge badge-green" title="Meta Conversions API">
+            <span className="status-dot status-dot-green animate-pulse" />
+            CAPI 9/9 · EMQ 8.8
           </div>
-          <div className="badge badge-cyan">
-            <MessageSquare size={12} />
-            SendGate Anti-Ban
+          <div className="badge badge-cyan" title="Anti-Ban SendGate">
+            <span className="status-dot" style={{ background: '#0EA5E9' }} />
+            SendGate P2P
           </div>
 
-          {/* RBAC Role Switcher Dropdown */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingLeft: '8px', borderLeft: '1px solid var(--border-subtle)' }}>
+          {/* Role Switcher */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', paddingLeft: '8px', borderLeft: '1px solid var(--border-subtle)' }}>
             <select
               value={userRole}
               onChange={(e) => handleRoleChange(e.target.value as any)}
               style={{
-                background: 'rgba(255, 255, 255, 0.08)',
-                color: '#fff',
-                border: '1px solid var(--border-subtle)',
-                borderRadius: '8px',
-                padding: '6px 10px',
-                fontSize: '0.75rem',
+                background: '#0B0F19',
+                color: '#E2E8F0',
+                border: '1px solid var(--border-default)',
+                borderRadius: '6px',
+                padding: '4px 8px',
+                fontSize: '0.74rem',
                 fontWeight: 600,
                 cursor: 'pointer',
               }}
             >
-              <option value="MASTER_AGENCY">👑 Gisley (Agência Master)</option>
-              <option value="CLIENT_OWNER">🏢 Bruna Ortiz (Cliente Dono)</option>
-              <option value="CLIENT_ATTENDANT">💬 Carla (Atendente WhatsApp)</option>
+              <option value="MASTER_AGENCY">Agência (Master)</option>
+              <option value="CLIENT_OWNER">Cliente (Dono)</option>
+              <option value="CLIENT_ATTENDANT">Atendente (WhatsApp)</option>
             </select>
           </div>
         </div>
       </header>
 
-      {/* Attendant Mode Security Notification */}
-      {userRole === 'CLIENT_ATTENDANT' && (
-        <div style={{ background: 'rgba(6, 182, 212, 0.12)', borderBottom: '1px solid rgba(6, 182, 212, 0.3)', padding: '8px 24px', fontSize: '0.78rem', color: 'var(--accent-cyan)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span>🔒 <strong>Modo Atendente WhatsApp:</strong> Visualização restrita ao atendimento de conversas e recuperação no chat. Dados financeiros e CAPI protegidos.</span>
-          <span style={{ fontSize: '0.7rem', color: 'var(--text-dim)' }}>Perfil: CLIENT_ATTENDANT</span>
-        </div>
-      )}
-
       {/* Main Content Area */}
-      {activePortal === 'client' ? (
-        /* ======================================================== */
-        /* PAINEL EXCLUSIVO DO CLIENTE (COM SIDEBAR DEDICADA) */
-        /* ======================================================== */
-        <div style={{ display: 'flex', flex: 1 }}>
+      {agencyView === 'client-portal' && activeClient ? (
+        <div style={{ display: 'flex', flex: 1, minHeight: 'calc(100vh - 58px)' }}>
+          {/* Client Left Navigation Sidebar */}
           <ClientSidebar
             activeTab={clientTab}
             onSelectTab={setClientTab}
-            onSwitchToAgency={() => setActivePortal('agency')}
-            isReceivingLeads={isReceivingLeads}
-            onToggleReceivingLeads={() => setIsReceivingLeads(!isReceivingLeads)}
+            crmSubTab={crmSubTab}
+            onSelectCrmSubTab={setCrmSubTab}
+            whatsappSubTab={whatsappSubTab}
+            onSelectWhatsAppSubTab={setWhatsappSubTab}
+            clientName={activeClient.tradeName || activeClient.name}
+            onSwitchToAgency={() => setAgencyView('clients')}
             userRole={userRole}
           />
 
-          <main style={{ flex: 1, padding: '28px', maxWidth: '1440px', width: '100%', margin: '0 auto', overflowY: 'auto' }}>
-            {clientTab === 'dashboard' && (
-              <ClientDashboard clientData={clientData} onNavigateToTab={setClientTab} />
-            )}
-
-            {clientTab === 'tasks' && (
-              <ClientMiniClickUp clientId="cli_bruna_ppp" clientName="Bruna Ortiz (Pílula da Produtividade)" />
-            )}
-
-            {clientTab === 'reports' && (
-              <ClientReports />
-            )}
-
-            {clientTab === 'crm' && (
-              <ClientCrm />
-            )}
-
-            {clientTab === 'whatsapp' && (
-              <ClientWhatsApp />
-            )}
-
-            {clientTab === 'media' && (
-              <ClientMedia />
-            )}
+          {/* Client Main Workspace */}
+          <main style={{ flex: 1, padding: '24px 28px', overflowY: 'auto', background: 'var(--bg-canvas)' }}>
+            <ErrorBoundary>
+              {clientTab === 'organic' && (
+                <OrganicPanel client={activeClient} />
+              )}
+              {clientTab === 'dashboard' && (
+                <ClientDashboard
+                  clientData={{}}
+                  clientName={activeClient.tradeName || activeClient.name}
+                  onNavigateToTab={(tab: ClientNavTab) => setClientTab(tab)}
+                />
+              )}
+              {clientTab === 'reports' && (
+                <ClientReports clientId={activeClient.id} />
+              )}
+              {clientTab === 'crm' && (
+                <ClientCrm
+                  clientId={activeClient.id}
+                  clientName={activeClient.tradeName || activeClient.name}
+                  userRole={userRole}
+                  subTab={crmSubTab}
+                  onChangeSubTab={setCrmSubTab}
+                />
+              )}
+              {clientTab === 'whatsapp' && (
+                <ClientWhatsApp
+                  subTab={whatsappSubTab}
+                  onChangeSubTab={setWhatsappSubTab}
+                />
+              )}
+              {clientTab === 'media' && (
+                <ClientMedia />
+              )}
+              {clientTab === 'tasks' && (
+                <ClientMiniClickUp
+                  clientId={activeClient.id}
+                  clientName={activeClient.tradeName || activeClient.name}
+                  userRole={userRole}
+                />
+              )}
+            </ErrorBoundary>
           </main>
         </div>
       ) : (
-        /* ======================================================== */
-        /* PORTAL DA AGÊNCIA (GFB MASTER CLICKUP & CAPI GATEWAY) */
-        /* ======================================================== */
-        <main style={{ flex: 1, padding: '28px', maxWidth: '1600px', width: '100%', margin: '0 auto' }}>
-          <AgencyPortal
-            agencyData={agencyData}
-            tasks={tasks}
-            onMoveTask={handleMoveTask}
-            onCreateTask={handleCreateTask}
-            onOpenClientPortal={() => {
-              setActivePortal('client');
-              setClientTab('dashboard');
-            }}
-          />
+        <main style={{ flex: 1, padding: '32px 28px' }}>
+          <ErrorBoundary>
+            {agencyView === 'clients' && (
+              <ClientList
+                onNewClient={() => {
+                  setSelectedClientId(null);
+                  setAgencyView('new-client');
+                }}
+                onSelectClient={(client) => {
+                  setSelectedClientId(client.id);
+                  setAgencyView('edit-client');
+                }}
+                onOpenOrganic={(client) => {
+                  handleOpenClientPortal(client, 'organic');
+                }}
+              />
+            )}
+            {agencyView === 'new-client' && (
+              <ClientRegistration
+                onClientCreated={handleClientSaved}
+                onCancel={() => setAgencyView('clients')}
+              />
+            )}
+            {agencyView === 'edit-client' && (
+              <ClientRegistration
+                clientId={selectedClientId}
+                onClientCreated={handleClientSaved}
+                onCancel={() => {
+                  setSelectedClientId(null);
+                  setAgencyView('clients');
+                }}
+              />
+            )}
+          </ErrorBoundary>
         </main>
       )}
     </div>

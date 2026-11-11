@@ -12,6 +12,8 @@ import fs from "node:fs";
 import { authRoutes } from "./modules/auth/auth.routes.js";
 import { trackingRoutes } from "./modules/tracking/tracking.routes.js";
 import { webhookRoutes } from "./modules/tracking/webhooks/webhook.routes.js";
+import { clientRoutes } from "./modules/clients/clients.routes.js";
+import { organicRoutes } from "./modules/organic/organic.routes.js";
 import { apiRoutes } from "./routes/api.routes.js";
 import { authUserMiddleware } from "./middlewares/rbacMiddleware.js";
 
@@ -129,6 +131,8 @@ app.get("/api/auth/me", (req: Request, res: Response) => {
 app.use("/api/auth", authRoutes);
 app.use(trackingRoutes);
 app.use(webhookRoutes);
+app.use(clientRoutes);
+app.use(organicRoutes);
 app.use(apiRoutes);
 
 // Static frontend serving fallback (both ports 3000 and 3001 work seamlessly)

@@ -9,7 +9,7 @@ import {
   ExternalLink,
   Search,
   Send,
-  Sparkles,
+  Zap,
   Mic,
   Paperclip,
   CheckCheck,
@@ -30,10 +30,64 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 
-export function ClientWhatsApp() {
-  const [waSubTab, setWaSubTab] = useState<'groups' | 'chat' | 'heater' | 'warming' | 'radar'>('groups');
+import type { WhatsAppSubTab } from '../types/crm';
+import { LaunchList } from './launches/LaunchList';
+import { LaunchDetail } from './launches/LaunchDetail';
 
-  // Groups state
+export interface ClientWhatsAppProps {
+  subTab?: WhatsAppSubTab;
+  onChangeSubTab?: (tab: WhatsAppSubTab) => void;
+  chatTarget?: {
+    leadId?: string;
+    conversationId?: string;
+    name?: string;
+    phone?: string;
+    prefillText?: string;
+    returnTo?: {
+      crmSubTab: string;
+      leadId?: string;
+    };
+  } | null;
+  onChatTargetConsumed?: () => void;
+  onNavigateToCrmLead?: (leadId?: string, crmSubTab?: string) => void;
+  clientId?: string;
+}
+
+export function ClientWhatsApp({
+  subTab,
+  onChangeSubTab,
+  chatTarget,
+  onChatTargetConsumed,
+  onNavigateToCrmLead,
+  clientId = '',
+}: ClientWhatsAppProps = {}) {
+  const [waSubTab, setWaSubTabState] = useState<WhatsAppSubTab>(subTab || 'groups');
+
+  useEffect(() => {
+    if (subTab && subTab !== waSubTab) {
+      setWaSubTabState(subTab);
+    }
+  }, [subTab]);
+
+  const setWaSubTab = (tab: WhatsAppSubTab) => {
+    setWaSubTabState(tab);
+    onChangeSubTab?.(tab);
+  };
+
+  // Groups & Launches state (Bloco B)
+  const [selectedLaunchId, setSelectedLaunchId] = useState<string | null>(() => {
+    return sessionStorage.getItem('growth_selected_launch_id') || null;
+  });
+
+  const handleSelectLaunch = (id: string | null) => {
+    setSelectedLaunchId(id);
+    if (id) {
+      sessionStorage.setItem('growth_selected_launch_id', id);
+    } else {
+      sessionStorage.removeItem('growth_selected_launch_id');
+    }
+  };
+
   const [groups, setGroups] = useState<any[]>([]);
   const [copiedLink, setCopiedLink] = useState(false);
 
@@ -43,6 +97,9 @@ export function ClientWhatsApp() {
   const [messageInput, setMessageInput] = useState('');
   const [chatSearch, setChatSearch] = useState('');
   const [chatFilter, setChatFilter] = useState<'ALL' | 'UNREAD'>('ALL');
+  const [returnToInfo, setReturnToInfo] = useState<{ crmSubTab: string; leadId?: string } | null>(null);
+  const [allLeads, setAllLeads] = useState<any[]>([]);
+  const [isLinkingOpen, setIsLinkingOpen] = useState(false);
 
   // SendGate Spintax & Pacing Tester state
   const [spintaxInput, setSpintaxInput] = useState('{Olá|Oi|Tudo bem}, {nome}! Seu {acesso exclusivo|desconto especial} foi {liberado|ativado}.');
@@ -53,7 +110,7 @@ export function ClientWhatsApp() {
   const [instances, setInstances] = useState<any[]>([]);
   const [showQrModal, setShowQrModal] = useState(false);
   const [qrCodeData, setQrCodeData] = useState<string>('');
-  const [activeInstanceKey, setActiveInstanceKey] = useState<string>('aqc_bruna_01');
+  const [activeInstanceKey, setActiveInstanceKey] = useState<string>('aqc_chip_01');
   const [showAddInstanceModal, setShowAddInstanceModal] = useState(false);
   const [newInstanceName, setNewInstanceName] = useState('');
   const [newInstancePhone, setNewInstancePhone] = useState('');
@@ -98,10 +155,60 @@ export function ClientWhatsApp() {
     handleSearchRadar();
   }, []);
 
+  useEffect(() => {
+    fetch(`/api/crm/leads?clientId=${clientId}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.leads) setAllLeads(data.leads);
+      })
+      .catch(console.error);
+  }, [clientId]);
+
+  useEffect(() => {
+    if (chatTarget) {
+      setWaSubTab('chat');
+      if (chatTarget.returnTo) {
+        setReturnToInfo(chatTarget.returnTo);
+      }
+      if (chatTarget.prefillText) {
+        setMessageInput(chatTarget.prefillText);
+      }
+
+      fetch(`/api/whatsapp/chats?clientId=${clientId}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.conversations) {
+            setConversations(data.conversations);
+            if (chatTarget.conversationId) {
+              setActiveChatId(chatTarget.conversationId);
+            } else if (chatTarget.phone) {
+              const digits = chatTarget.phone.replace(/\D/g, '');
+              const found = data.conversations.find(
+                (c: any) => (c.phone || c.contactPhone || '').replace(/\D/g, '') === digits
+              );
+              if (found) setActiveChatId(found.id);
+            }
+          }
+        })
+        .catch(console.error);
+
+      onChatTargetConsumed?.();
+    }
+  }, [chatTarget, clientId]);
+
   const activeConversation = conversations.find((c) => c.id === activeChatId) || conversations[0];
 
+  const linkedLead = activeConversation
+    ? allLeads.find((l) => l.id === activeConversation.leadId) ||
+      allLeads.find((l) => {
+        const cPhone = (activeConversation.phone || activeConversation.contactPhone || '').replace(/\D/g, '');
+        const lPhone = (l.phone || '').replace(/\D/g, '');
+        return cPhone && lPhone && cPhone === lPhone;
+      })
+    : null;
+
   const handleCopyLink = () => {
-    navigator.clipboard.writeText(`${window.location.origin}/l/bruna-vip`);
+    navigator.clipboard.writeText(`${window.location.origin}/l/vip`);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2000);
   };
@@ -159,8 +266,8 @@ export function ClientWhatsApp() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         text: spintaxInput,
-        leadName: 'Bruna',
-        instanceKey: 'aqc_bruna_01',
+        leadName: 'Beatriz',
+        instanceKey: activeInstanceKey || 'aqc_chip_01',
       }),
     })
       .then((res) => res.json())
@@ -263,7 +370,7 @@ export function ClientWhatsApp() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        clientId: 'cli_bruna_ppp',
+        clientId: clientId || '',
         items: [item],
       }),
     })
@@ -284,7 +391,7 @@ export function ClientWhatsApp() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        clientId: 'cli_bruna_ppp',
+        clientId: clientId || '',
         items: toImport,
       }),
     })
@@ -299,143 +406,108 @@ export function ClientWhatsApp() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      {/* Sub Tabs Bar */}
-      <div style={{ display: 'flex', gap: '10px', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '14px', flexWrap: 'wrap' }}>
-        {[
-          { id: 'groups', label: 'Grupos VIP (Lançamentos)', icon: Users, badge: `${groups.length} Grupos` },
-          { id: 'chat', label: 'Chat WhatsApp (Inbox)', icon: MessageSquare, badge: `${conversations.length} Conversas` },
-          { id: 'heater', label: 'Chips & Anti-Ban SendGate', icon: Flame, badge: `${instances.length} Chips` },
-          { id: 'warming', label: 'Aquecimento P2P (Warming Network)', icon: Radio, badge: 'P2P Ativo' },
-          { id: 'radar', label: 'LeadRadar B2B', icon: Search, badge: 'Prospecção' },
-        ].map((tab) => {
-          const Icon = tab.icon;
-          const isActive = waSubTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setWaSubTab(tab.id as any)}
-              className={isActive ? 'btn btn-primary' : 'btn btn-secondary'}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '8px 16px',
-                fontSize: '0.85rem',
-                fontWeight: 600,
-              }}
-            >
-              <Icon size={16} />
-              {tab.label}
-              <span
-                style={{
-                  fontSize: '0.7rem',
-                  padding: '2px 6px',
-                  borderRadius: '10px',
-                  background: isActive ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.06)',
-                }}
-              >
-                {tab.badge}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* SUBTAB 1: GRUPOS VIP */}
-      {waSubTab === 'groups' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          {/* Rotating Link Card */}
-          <div className="glass-panel" style={{ padding: '24px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '12px' }}>
-              <div>
-                <span className="badge badge-cyan" style={{ marginBottom: '6px' }}>Link Rotativo Ativo</span>
-                <h3 style={{ fontSize: '1.25rem', fontWeight: 800 }}>Lançamento: Imersão MTC Avançada</h3>
-                <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-                  O link público distribui novos leads automaticamente para o grupo que possui vagas livres (&lt; 95% de ocupação).
-                </p>
-              </div>
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <a
-                  href="/l/bruna-vip"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="btn btn-secondary"
-                  style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem' }}
-                >
-                  <ExternalLink size={14} /> Testar Redirecionamento
-                </a>
-                <button
-                  onClick={handleCopyLink}
-                  className="btn btn-primary"
-                  style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem' }}
-                >
-                  {copiedLink ? <Check size={14} /> : <Copy size={14} />}
-                  {copiedLink ? 'Copiado!' : 'Copiar Link /l/bruna-vip'}
-                </button>
-              </div>
-            </div>
-
-            <div style={{ background: 'rgba(0,0,0,0.3)', padding: '12px 16px', borderRadius: '10px', border: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <code style={{ fontSize: '0.85rem', color: 'var(--accent-cyan)' }}>
-                https://grupovip.gfbdigital.com.br/l/bruna-vip
-              </code>
-              <span style={{ fontSize: '0.75rem', color: 'var(--accent-green)', fontWeight: 600 }}>
-                ● 26 grupos vinculados · 89.3% retenção
-              </span>
-            </div>
+      {/* Sub-view Header (navegação orientada pelo Sidebar) */}
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          paddingBottom: '14px',
+          borderBottom: '1px solid var(--border-subtle)',
+          flexWrap: 'wrap',
+          gap: '12px',
+        }}
+      >
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span className="badge badge-green">WHATSAPP</span>
+            <span style={{ color: 'var(--text-dim)', fontSize: '0.8rem' }}>•</span>
+            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+              {waSubTab === 'groups' && 'Grupos VIP & Lançamentos'}
+              {waSubTab === 'chat' && 'Inbox Omnichannel de Atendimento'}
+              {waSubTab === 'heater' && 'Chips & Anti-Ban SendGate'}
+              {waSubTab === 'warming' && 'Aquecimento P2P (Warming Network)'}
+              {waSubTab === 'radar' && 'LeadRadar Prospecção B2B'}
+            </span>
           </div>
+          <h2 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#fff', marginTop: '4px', letterSpacing: '-0.02em' }}>
+            {waSubTab === 'groups' && 'Gestão de Grupos VIP & Link Rotativo'}
+            {waSubTab === 'chat' && 'Inbox WhatsApp & Atendimento em Tempo Real'}
+            {waSubTab === 'heater' && 'Isolamento de Chips & SendGate Anti-Ban'}
+            {waSubTab === 'warming' && 'Rede Distribuída de Aquecimento P2P'}
+            {waSubTab === 'radar' && 'LeadRadar B2B — Radar de Prospecção'}
+          </h2>
+        </div>
 
-          {/* Groups Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
-            {groups.map((group) => {
-              const isReceiving = group.status === 'RECEIVING';
-              const percent = Math.round((group.memberCount / group.maxMembers) * 100);
-              return (
-                <div key={group.id} className="glass-panel" style={{ padding: '18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontWeight: 800, fontSize: '0.95rem' }}>{group.name}</span>
-                    <span className={isReceiving ? 'badge badge-green' : 'badge badge-amber'}>
-                      {isReceiving ? 'Recebendo' : 'Pausado'}
-                    </span>
-                  </div>
-
-                  <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: 'var(--text-dim)', marginBottom: '6px' }}>
-                      <span>Membros</span>
-                      <span style={{ fontWeight: 700, color: '#fff' }}>{group.memberCount} / {group.maxMembers}</span>
-                    </div>
-                    <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.06)', borderRadius: '3px', overflow: 'hidden' }}>
-                      <div
-                        style={{
-                          width: `${percent}%`,
-                          height: '100%',
-                          background: percent > 90 ? 'var(--accent-rose)' : 'linear-gradient(90deg, #10B981, #06B6D4)',
-                          borderRadius: '3px',
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '8px', borderTop: '1px solid var(--border-subtle)' }}>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>Ocupação: {percent}%</span>
-                    <button
-                      onClick={() => handleToggleGroup(group.id, group.status)}
-                      className="btn btn-secondary"
-                      style={{ padding: '4px 10px', fontSize: '0.75rem' }}
-                    >
-                      {isReceiving ? 'Pausar' : 'Ativar'}
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div className="badge badge-green" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Radio size={12} className="animate-pulse" />
+            {instances.filter((i) => i.status === 'CONNECTED').length} Chip(s) Conectado(s)
+          </div>
+          <div className="badge badge-cyan" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <ShieldCheck size={12} />
+            SendGate Protegido
           </div>
         </div>
+      </div>
+
+      {/* SUBTAB 1: LANÇAMENTOS & GRUPOS VIP */}
+      {waSubTab === 'groups' && (
+        selectedLaunchId ? (
+          <LaunchDetail
+            launchId={selectedLaunchId}
+            onBack={() => handleSelectLaunch(null)}
+            onOpenChatWithPhone={(phone) => {
+              setWaSubTab('chat');
+              const found = conversations.find((c) => c.phone === phone);
+              if (found) {
+                setActiveChatId(found.id);
+              }
+            }}
+          />
+        ) : (
+          <LaunchList
+            clientId={clientId}
+            onSelectLaunch={(id) => handleSelectLaunch(id)}
+          />
+        )
       )}
 
       {/* SUBTAB 2: CHAT OMNICHANNEL */}
       {waSubTab === 'chat' && (
-        <div className="glass-panel" style={{ height: '720px', display: 'grid', gridTemplateColumns: '320px 1fr 300px', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {returnToInfo && (
+            <div
+              style={{
+                background: 'rgba(6, 182, 212, 0.1)',
+                border: '1px solid rgba(6, 182, 212, 0.3)',
+                borderRadius: '8px',
+                padding: '10px 16px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                fontSize: '0.82rem',
+              }}
+            >
+              <span style={{ color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <MessageSquare size={14} color="var(--accent-cyan)" /> Conversando via CRM com <strong>{activeConversation?.contactName || 'contato'}</strong>
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  const info = returnToInfo;
+                  setReturnToInfo(null);
+                  onNavigateToCrmLead?.(info.leadId, info.crmSubTab);
+                }}
+                className="btn btn-secondary"
+                style={{ padding: '5px 12px', fontSize: '0.78rem', borderColor: 'var(--accent-cyan)', color: 'var(--accent-cyan)' }}
+              >
+                ← Voltar para o lead no CRM
+              </button>
+            </div>
+          )}
+
+          <div className="glass-panel" style={{ height: '720px', display: 'grid', gridTemplateColumns: '320px 1fr 300px', overflow: 'hidden' }}>
           {/* COLUMN 1: CONVERSATIONS LIST */}
           <div style={{ borderRight: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column' }}>
             <div style={{ padding: '14px', borderBottom: '1px solid var(--border-subtle)' }}>
@@ -508,94 +580,213 @@ export function ClientWhatsApp() {
           </div>
 
           {/* COLUMN 2: ACTIVE CHAT & COMPOSER */}
-          <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-            <div style={{ padding: '12px 18px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)' }}>
-              <div>
-                <div style={{ fontWeight: 800, fontSize: '0.95rem' }}>{activeConversation?.contactName}</div>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>
-                  {activeConversation?.contactPhone} • Chip ativo: <span style={{ color: 'var(--accent-green)' }}>{activeConversation?.chipKey}</span>
-                </div>
-              </div>
-              <button onClick={handleSuggestAiReply} className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: '0.72rem' }}>
-                <Sparkles size={12} color="var(--accent-cyan)" /> Sugerir Resposta IA
-              </button>
-            </div>
-
-            <div style={{ flex: 1, padding: '16px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {activeConversation?.messages.map((m: any) => {
-                const isAgent = m.sender === 'AGENT';
-                return (
-                  <div
-                    key={m.id}
-                    style={{
-                      alignSelf: isAgent ? 'flex-end' : 'flex-start',
-                      maxWidth: '70%',
-                      background: isAgent ? 'linear-gradient(135deg, #059669, #10B981)' : 'rgba(255, 255, 255, 0.08)',
-                      color: '#fff',
-                      padding: '10px 14px',
-                      borderRadius: isAgent ? '14px 14px 2px 14px' : '14px 14px 14px 2px',
-                      fontSize: '0.84rem',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
-                    }}
-                  >
-                    <div>{m.text}</div>
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '4px', marginTop: '4px', fontSize: '0.65rem', opacity: 0.8 }}>
-                      <span>{m.time}</span>
-                      {isAgent && <CheckCheck size={12} />}
-                    </div>
+          {activeConversation ? (
+            <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+              <div style={{ padding: '12px 18px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)' }}>
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: '0.95rem' }}>{activeConversation.contactName}</div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>
+                    {activeConversation.contactPhone} • Chip ativo: <span style={{ color: 'var(--accent-green)' }}>{activeConversation.chipKey}</span>
                   </div>
-                );
-              })}
-            </div>
+                </div>
+                <button onClick={handleSuggestAiReply} className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: '0.72rem' }}>
+                  <Zap size={12} color="var(--accent-cyan)" /> Sugestão de Resposta
+                </button>
+              </div>
 
-            <form onSubmit={handleSendMessage} style={{ padding: '12px', borderTop: '1px solid var(--border-subtle)', display: 'flex', gap: '8px', background: 'rgba(255,255,255,0.02)' }}>
-              <input
-                type="text"
-                placeholder="Digite uma mensagem com SendGate Anti-Ban..."
-                value={messageInput}
-                onChange={(e) => setMessageInput(e.target.value)}
-                style={{
-                  flex: 1,
-                  background: 'rgba(255,255,255,0.05)',
-                  border: '1px solid var(--border-subtle)',
-                  borderRadius: '10px',
-                  padding: '10px 14px',
-                  color: '#fff',
-                  fontSize: '0.85rem',
-                }}
-              />
-              <button type="submit" className="btn btn-primary" style={{ padding: '0 16px' }}>
-                <Send size={16} />
-              </button>
-            </form>
-          </div>
+              <div style={{ flex: 1, padding: '16px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {(activeConversation.messages || []).map((m: any) => {
+                  const isAgent = m.sender === 'AGENT';
+                  return (
+                    <div
+                      key={m.id}
+                      style={{
+                        alignSelf: isAgent ? 'flex-end' : 'flex-start',
+                        maxWidth: '70%',
+                        background: isAgent ? 'linear-gradient(135deg, #059669, #10B981)' : 'rgba(255, 255, 255, 0.08)',
+                        color: '#fff',
+                        padding: '10px 14px',
+                        borderRadius: isAgent ? '14px 14px 2px 14px' : '14px 14px 14px 2px',
+                        fontSize: '0.84rem',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+                      }}
+                    >
+                      <div>{m.text}</div>
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '4px', marginTop: '4px', fontSize: '0.65rem', opacity: 0.8 }}>
+                        <span>{m.time}</span>
+                        {isAgent && <CheckCheck size={12} />}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <form onSubmit={handleSendMessage} style={{ padding: '12px', borderTop: '1px solid var(--border-subtle)', display: 'flex', gap: '8px', background: 'rgba(255,255,255,0.02)' }}>
+                <input
+                  type="text"
+                  placeholder="Digite uma mensagem com SendGate Anti-Ban..."
+                  value={messageInput}
+                  onChange={(e) => setMessageInput(e.target.value)}
+                  style={{
+                    flex: 1,
+                    background: 'rgba(255,255,255,0.05)',
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: '10px',
+                    padding: '10px 14px',
+                    color: '#fff',
+                    fontSize: '0.85rem',
+                  }}
+                />
+                <button type="submit" className="btn btn-primary" style={{ padding: '0 16px' }}>
+                  <Send size={16} />
+                </button>
+              </form>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
+              <MessageSquare size={44} color="var(--text-dim)" style={{ marginBottom: '14px', opacity: 0.5 }} />
+              <div style={{ fontWeight: 750, color: '#fff', fontSize: '1rem', marginBottom: '6px' }}>Nenhuma conversa selecionada</div>
+              <div style={{ fontSize: '0.8rem', maxWidth: '300px', lineHeight: 1.5 }}>
+                Selecione uma conversa na lista ou inicie um atendimento pelo CRM.
+              </div>
+            </div>
+          )}
 
           {/* COLUMN 3: CRM DETAILS PANEL */}
           <div style={{ borderLeft: '1px solid var(--border-subtle)', padding: '18px', overflowY: 'auto' }}>
-            <h4 style={{ fontSize: '0.9rem', fontWeight: 800, marginBottom: '14px' }}>Ficha 360° do Lead</h4>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '0.8rem' }}>
-              <div>
-                <span style={{ color: 'var(--text-dim)' }}>Nome:</span>
-                <div style={{ fontWeight: 700 }}>{activeConversation?.contactName}</div>
-              </div>
-              <div>
-                <span style={{ color: 'var(--text-dim)' }}>Telefone E.164:</span>
-                <div>{activeConversation?.contactPhone}</div>
-              </div>
-              <div>
-                <span style={{ color: 'var(--text-dim)' }}>Temperatura:</span>
-                <div><span className="badge badge-green">QUENTE (Score 94)</span></div>
-              </div>
-              <div>
-                <span style={{ color: 'var(--text-dim)' }}>Tags de Origem:</span>
-                <div style={{ display: 'flex', gap: '4px', marginTop: '4px', flexWrap: 'wrap' }}>
-                  <span className="badge badge-cyan">utm:bruna_vip</span>
-                  <span className="badge badge-green">Grupo VIP 03</span>
-                </div>
-              </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+              <h4 style={{ fontSize: '0.9rem', fontWeight: 800 }}>Ficha 360° do Lead</h4>
+              {linkedLead && (
+                <button
+                  type="button"
+                  onClick={() => onNavigateToCrmLead?.(linkedLead.id, 'leads')}
+                  className="btn btn-secondary"
+                  style={{ padding: '3px 8px', fontSize: '0.72rem', color: 'var(--accent-cyan)' }}
+                  title="Abrir detalhes no CRM"
+                >
+                  Ver no CRM ↗
+                </button>
+              )}
             </div>
+
+            {linkedLead ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '0.8rem' }}>
+                <div>
+                  <span style={{ color: 'var(--text-dim)' }}>Nome:</span>
+                  <div style={{ fontWeight: 700, color: '#fff' }}>{linkedLead.name}</div>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--text-dim)' }}>E-mail:</span>
+                  <div style={{ color: 'var(--text-muted)' }}>{linkedLead.email}</div>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--text-dim)' }}>Telefone E.164:</span>
+                  <div style={{ color: 'var(--accent-cyan)' }}>{linkedLead.phone}</div>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--text-dim)' }}>Temperatura & Estágio:</span>
+                  <div style={{ display: 'flex', gap: '6px', marginTop: '4px' }}>
+                    {linkedLead.temperature === 'HOT' && <span className="badge badge-rose">🔥 Quente</span>}
+                    {linkedLead.temperature === 'WARM' && <span className="badge badge-amber">⚡ Morno</span>}
+                    {linkedLead.temperature === 'COLD' && <span className="badge badge-cyan">❄️ Frio</span>}
+                    {linkedLead.temperature === 'INACTIVE' && <span className="badge" style={{ background: 'rgba(255,255,255,0.06)' }}>Inativo</span>}
+                    <span className="badge badge-green">{linkedLead.stage}</span>
+                  </div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', background: 'rgba(255,255,255,0.02)', padding: '10px', borderRadius: '8px' }}>
+                  <div>
+                    <div style={{ fontSize: '0.68rem', color: 'var(--text-dim)' }}>Pontos RFM</div>
+                    <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--accent-green)' }}>{linkedLead.rfmPoints || 0} pts</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.68rem', color: 'var(--text-dim)' }}>Total Gasto</div>
+                    <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#fff' }}>
+                      R$ {Number(linkedLead.totalSpent || (linkedLead.totalSpentCents ? Number(linkedLead.totalSpentCents) / 100 : 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </div>
+                  </div>
+                </div>
+                {linkedLead.tags && linkedLead.tags.length > 0 && (
+                  <div>
+                    <span style={{ color: 'var(--text-dim)' }}>Tags:</span>
+                    <div style={{ display: 'flex', gap: '4px', marginTop: '4px', flexWrap: 'wrap' }}>
+                      {linkedLead.tags.map((t: string) => (
+                        <span key={t} className="badge badge-cyan">{t}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {linkedLead.attributionSource && (
+                  <div>
+                    <span style={{ color: 'var(--text-dim)' }}>Atribuição:</span>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{linkedLead.attributionSource}</div>
+                  </div>
+                )}
+              </div>
+            ) : activeConversation ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '0.8rem' }}>
+                <div style={{ background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.2)', padding: '12px', borderRadius: '8px', color: 'var(--accent-amber)' }}>
+                  ⚠️ Contato não vinculado a um lead existente no CRM.
+                </div>
+                <div>
+                  <span style={{ color: 'var(--text-dim)' }}>Contato:</span>
+                  <div style={{ fontWeight: 700 }}>{activeConversation.contactName}</div>
+                  <div style={{ color: 'var(--text-muted)' }}>{activeConversation.contactPhone || activeConversation.phone}</div>
+                </div>
+                {!isLinkingOpen ? (
+                  <button
+                    type="button"
+                    onClick={() => setIsLinkingOpen(true)}
+                    className="btn btn-secondary"
+                    style={{ fontSize: '0.78rem', justifyContent: 'center' }}
+                  >
+                    + Vincular a um Lead
+                  </button>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '8px' }}>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 600 }}>Selecione um lead da base:</div>
+                    <select
+                      onChange={(e) => {
+                        const leadId = e.target.value;
+                        if (!leadId) return;
+                        if (activeConversation) {
+                          activeConversation.leadId = leadId;
+                        }
+                        setIsLinkingOpen(false);
+                      }}
+                      style={{
+                        background: 'rgba(0,0,0,0.5)',
+                        border: '1px solid var(--border-subtle)',
+                        color: '#fff',
+                        borderRadius: '6px',
+                        padding: '6px 8px',
+                        fontSize: '0.78rem',
+                      }}
+                    >
+                      <option value="">Selecione um lead...</option>
+                      {allLeads.map((l) => (
+                        <option key={l.id} value={l.id}>
+                          {l.name} ({l.phone || l.email})
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => setIsLinkingOpen(false)}
+                      style={{ background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: '0.7rem', cursor: 'pointer', textAlign: 'right' }}
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div style={{ color: 'var(--text-dim)', fontSize: '0.8rem', textAlign: 'center', marginTop: '30px' }}>
+                Nenhum lead selecionado.
+              </div>
+            )}
           </div>
         </div>
+      </div>
       )}
 
       {/* SUBTAB 3: CHIPS & ANTI-BAN SENDGATE */}
@@ -692,11 +883,11 @@ export function ClientWhatsApp() {
           <div className="glass-panel" style={{ padding: '24px', border: '1px solid rgba(6, 182, 212, 0.3)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Sparkles size={18} color="var(--accent-cyan)" />
-                <h4 style={{ fontSize: '1.05rem', fontWeight: 800 }}>Simulador de Spintax & Pacing Anti-Ban SendGate</h4>
+                <Radio size={18} color="var(--accent-cyan)" />
+                <h4 style={{ fontSize: '1.05rem', fontWeight: 700 }}>Simulador de Spintax & Pacing Anti-Ban SendGate</h4>
               </div>
               <div style={{ display: 'flex', gap: '6px' }}>
-                <span className="badge badge-green">🟢 Horário Comercial: 08h-21h</span>
+                <span className="badge badge-green">Horário Comercial: 08h-21h</span>
                 <span className="badge badge-cyan">Gaussiano: 15s-45s</span>
               </div>
             </div>
@@ -728,7 +919,7 @@ export function ClientWhatsApp() {
               className="btn btn-primary"
               style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', marginBottom: '14px' }}
             >
-              <Sparkles size={14} /> {isTestingSpintax ? 'Processando Pacing...' : 'Testar Resolução & Jitter Gaussiano'}
+              <Radio size={14} /> {isTestingSpintax ? 'Processando Pacing...' : 'Testar Resolução & Jitter Gaussiano'}
             </button>
 
             {spintaxResult && (
@@ -772,7 +963,12 @@ export function ClientWhatsApp() {
       )}
 
       {/* SUBTAB 4: AQUECIMENTO P2P (WARMING NETWORK) */}
-      {waSubTab === 'warming' && warmingData && (
+      {waSubTab === 'warming' && (
+        !warmingData ? (
+          <div style={{ padding: '60px 0', textAlign: 'center', color: 'var(--text-muted)' }}>
+            Carregando rede de aquecimento P2P...
+          </div>
+        ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           {/* Big numbers overview */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
@@ -900,6 +1096,7 @@ export function ClientWhatsApp() {
             </div>
           </div>
         </div>
+        )
       )}
 
       {/* SUBTAB 5: LEADRADAR B2B */}

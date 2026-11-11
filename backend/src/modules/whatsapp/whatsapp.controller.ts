@@ -5,6 +5,7 @@ import { sendGateService } from "../../services/sendGateService.js";
 import { warmingNetworkService } from "../../services/warmingNetworkService.js";
 import { leadRadarService } from "../../services/leadRadarService.js";
 import { eventBus } from "../../services/eventBus.js";
+import { ensureSystemTask, resolveSystemTask } from "../tasks/systemTasks.service.js";
 
 export async function listInstances(req: Request, res: Response): Promise<void> {
   const disconnectedCount = mockDb.whatsappInstances.filter((i) => i.status === "DISCONNECTED").length;
@@ -61,9 +62,19 @@ export async function toggleInstanceStatus(req: Request, res: Response): Promise
     inst.status = inst.status === "CONNECTED" ? "DISCONNECTED" : "CONNECTED";
   }
 
-  // Prevenção automática: se desconectou, pausa aquecimento preventivo
+  // Prevenção automática e tarefas de sistema (spec 10.1 & A5.1)
   if (inst.status === "DISCONNECTED") {
     warmingNetworkService.handleChipDisconnect(instanceKey);
+    ensureSystemTask({
+      clientId: inst.clientId || "cli_bruna_ppp",
+      sourceRef: `instance-down:${instanceKey}`,
+      title: `Reconectar chip ${inst.name || instanceKey}`,
+      area: "WHATSAPP",
+      priority: "URGENT",
+      link: "/whatsapp/chips",
+    });
+  } else if (inst.status === "CONNECTED") {
+    resolveSystemTask(`instance-down:${instanceKey}`);
   }
 
   eventBus.broadcast({
@@ -100,10 +111,22 @@ export async function connectInstance(req: Request, res: Response): Promise<void
 }
 
 export async function listChats(req: Request, res: Response): Promise<void> {
+  const { clientId } = req.query;
   const disconnected = mockDb.whatsappInstances.find((i) => i.status === "DISCONNECTED");
 
+  let conversations = mockDb.chatConversations;
+  if (clientId) {
+    conversations = conversations.filter((c) => c.clientId === clientId);
+  }
+
+  const enriched = conversations.map((c) => ({
+    ...c,
+    phone: c.phone || (c.contactPhone ? '+' + c.contactPhone.replace(/\D/g, '') : ''),
+    leadId: c.leadId || null,
+  }));
+
   res.json({
-    conversations: mockDb.chatConversations,
+    conversations: enriched,
     disconnectedAlert: disconnected
       ? {
           hasDisconnected: true,
@@ -112,6 +135,76 @@ export async function listChats(req: Request, res: Response): Promise<void> {
         }
       : { hasDisconnected: false },
   });
+}
+
+export async function openChat(req: Request, res: Response): Promise<void> {
+  const { leadId, phone, contactName, instanceKey, clientId = "cli_bruna_ppp" } = req.body;
+
+  if (!phone || typeof phone !== "string") {
+    res.status(400).json({ error: "Telefone é obrigatório para abrir uma conversa" });
+    return;
+  }
+
+  const digitsOnly = phone.replace(/\D/g, "");
+  if (!digitsOnly) {
+    res.status(400).json({ error: "Telefone inválido" });
+    return;
+  }
+
+  const normalizedPhone = '+' + digitsOnly;
+
+  // Busca conversa existente do mesmo cliente com o mesmo telefone normalizado
+  const existing = mockDb.chatConversations.find((c) => {
+    if (c.clientId !== clientId) return false;
+    const cPhoneDigits = (c.phone || c.contactPhone || "").replace(/\D/g, "");
+    return cPhoneDigits === digitsOnly;
+  });
+
+  if (existing) {
+    if (leadId && !existing.leadId) {
+      existing.leadId = leadId;
+    }
+    if (!existing.phone) {
+      existing.phone = normalizedPhone;
+    }
+    res.json({ conversation: existing });
+    return;
+  }
+
+  // Verifica se o cliente possui alguma instância conectada
+  const activeInstance = mockDb.whatsappInstances.find(
+    (i) => (instanceKey ? i.instanceKey === instanceKey : true) && i.status === "CONNECTED"
+  );
+
+  if (!activeInstance) {
+    res.status(409).json({
+      error: "NO_CONNECTED_INSTANCE",
+      message: "Nenhuma instância do WhatsApp conectada para este cliente. Conecte um chip no menu WhatsApp antes de iniciar conversas.",
+    });
+    return;
+  }
+
+  const newConv = {
+    id: `chat_${Date.now()}`,
+    clientId,
+    leadId: leadId || null,
+    phone: normalizedPhone,
+    contactName: contactName || "Contato",
+    contactPhone: phone.startsWith("+") ? phone : normalizedPhone,
+    chipKey: activeInstance.instanceKey,
+    temperature: "WARM" as const,
+    stage: "Atendimento",
+    potentialCents: BigInt(0),
+    unreadCount: 0,
+    lastMessage: "Conversa iniciada",
+    lastMessageTime: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+    tags: ["Lead"],
+    notes: "",
+    messages: [],
+  };
+
+  mockDb.chatConversations.unshift(newConv);
+  res.status(201).json({ conversation: newConv });
 }
 
 export async function sendChatMessage(req: Request, res: Response): Promise<void> {

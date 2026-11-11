@@ -20,6 +20,65 @@ enum UserRole {
   CLIENT
 }
 
+enum BusinessType {
+  INFOPRODUTOR
+  NEGOCIO_LOCAL
+  ECOMMERCE
+  SAAS
+  SERVICOS
+  OUTRO
+}
+
+enum ClientStatus {
+  ATIVO
+  PAUSADO
+  ONBOARDING
+  CANCELADO
+}
+
+enum DocumentType {
+  CPF
+  CNPJ
+}
+
+enum BillingType {
+  MENSAL
+  UNICO
+  RECORRENTE_VARIAVEL
+}
+
+enum PaymentMethod {
+  PIX
+  BOLETO
+  CARTAO
+  TRANSFERENCIA
+}
+
+enum ContractStatus {
+  RASCUNHO
+  ENVIADO
+  ASSINADO
+  CANCELADO
+}
+
+enum AdBudgetPayer {
+  CLIENTE
+  AGENCIA
+}
+
+enum ReportFrequency {
+  SEMANAL
+  QUINZENAL
+  MENSAL
+}
+
+enum ReportChannel {
+  EMAIL
+  WHATSAPP
+  DASHBOARD
+  REUNIAO
+}
+
 model User {
   id           String   @id @default(uuid())
   email        String   @unique
@@ -36,6 +95,7 @@ model User {
   createdTasks   Task[]               @relation("TaskCreator")
   assignedTasks  Task[]               @relation("TaskAssignee")
   taskComments   TaskComment[]
+  managedClients Client[]             @relation("ClientManager")
 
   @@map("users")
 }
@@ -54,6 +114,7 @@ model Organization {
   clients     Client[]
   tasks       Task[]
   instances   WhatsAppInstance[]
+  services    ServiceCatalog[]
 
   @@map("organizations")
 }
@@ -72,19 +133,134 @@ model OrganizationMember {
   @@map("organization_members")
 }
 
-model Client {
-  id              String   @id @default(uuid())
-  organizationId  String   @map("organization_id")
+// ---- Services Catalog (agency-level) ----
+model ServiceCatalog {
+  id              String       @id @default(uuid())
+  organizationId  String       @map("organization_id")
   name            String
-  slug            String
-  document        String?  // CNPJ / CPF masked
-  revenueGoalCents BigInt  @default(0) @map("revenue_goal_cents") // Meta mensal em centavos
-  isActive        Boolean  @default(true) @map("is_active")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  description     String?
+  defaultPriceCents BigInt     @default(0) @map("default_price_cents")
+  isActive        Boolean      @default(true) @map("is_active")
+  createdAt       DateTime     @default(now()) @map("created_at")
 
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  clientServices  ClientService[]
+
+  @@unique([organizationId, name])
+  @@map("service_catalog")
+}
+
+// ---- Client-specific service with negotiated pricing ----
+model ClientService {
+  id              String         @id @default(uuid())
+  clientId        String         @map("client_id")
+  serviceId       String         @map("service_id")
+  negotiatedPriceCents BigInt    @map("negotiated_price_cents")
+  startDate       DateTime       @map("start_date")
+  isActive        Boolean        @default(true) @map("is_active")
+  createdAt       DateTime       @default(now()) @map("created_at")
+
+  client          Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  service         ServiceCatalog @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, serviceId])
+  @@map("client_services")
+}
+
+model Client {
+  id              String       @id @default(uuid())
+  organizationId  String       @map("organization_id")
+
+  // ---- Dados Cadastrais ----
+  name            String                               // Razão social ou nome
+  tradeName       String?      @map("trade_name")      // Nome fantasia
+  slug            String
+  documentType    DocumentType @default(CPF)  @map("document_type")
+  document        String?                              // CPF ou CNPJ
+  contactName     String?      @map("contact_name")    // Responsável / pessoa de contato
+  contactRole     String?      @map("contact_role")    // Cargo do contato
+  whatsapp        String?                              // WhatsApp principal
+  email           String?                              // E-mail
+  phone           String?                              // Telefone fixo
+
+  // ---- Endereço ----
+  addressStreet   String?      @map("address_street")
+  addressNumber   String?      @map("address_number")
+  addressComplement String?    @map("address_complement")
+  addressNeighborhood String?  @map("address_neighborhood")
+  addressCity     String?      @map("address_city")
+  addressState    String?      @map("address_state")
+  addressZip      String?      @map("address_zip")
+
+  // ---- Segmento e presença online ----
+  segment         String?                              // Nicho / segmento
+  website         String?
+  instagramHandle String?      @map("instagram_handle") // @perfil
+  businessType    BusinessType @default(INFOPRODUTOR) @map("business_type")
+
+  // ---- Status e responsável ----
+  status          ClientStatus @default(ONBOARDING)
+  managerId       String?      @map("manager_id")      // Membro da equipe dono da conta
+  origin          String?                              // Indicação, tráfego, prospecção etc
+  relationshipStartDate DateTime? @map("relationship_start_date")
+
+  // ---- Contrato e Financeiro ----
+  contractTotalCents BigInt    @default(0) @map("contract_total_cents")
+  billingType     BillingType  @default(MENSAL) @map("billing_type")
+  billingDueDay   Int          @default(10)   @map("billing_due_day") // Dia do vencimento
+  paymentMethod   PaymentMethod @default(PIX) @map("payment_method")
+  billingEmail    String?      @map("billing_email")    // E-mail de faturamento
+  billingNotes    String?      @map("billing_notes")
+
+  contractStartDate  DateTime? @map("contract_start_date")
+  contractEndDate    DateTime? @map("contract_end_date")
+  contractDurationMonths Int?  @map("contract_duration_months")
+  autoRenew       Boolean      @default(true) @map("auto_renew")
+  adjustmentIndex String?      @map("adjustment_index") // IGPM, IPCA etc
+  adjustmentDate  DateTime?    @map("adjustment_date")
+  contractFileUrl String?      @map("contract_file_url") // URL do upload
+  contractSignatureStatus ContractStatus @default(RASCUNHO) @map("contract_signature_status")
+  cancellationReason String?   @map("cancellation_reason")
+
+  // ---- Verba de Anúncio ----
+  adBudgetCents   BigInt       @default(0) @map("ad_budget_cents") // Valor mensal
+  adBudgetPayer   AdBudgetPayer @default(CLIENTE) @map("ad_budget_payer")
+
+  // ---- Meta Integration ----
+  metaTokenEnc    String?      @map("meta_token_enc")    // Token criptografado
+  metaTokenValid  Boolean      @default(false) @map("meta_token_valid")
+  metaTokenLastCheck DateTime? @map("meta_token_last_check")
+  metaBusinessId  String?      @map("meta_business_id")
+  metaPageId      String?      @map("meta_page_id")
+  metaPageName    String?      @map("meta_page_name")
+  metaIgAccountId String?      @map("meta_ig_account_id")
+
+  // ---- Metas e Acompanhamento ----
+  mainObjective   String?      @map("main_objective")    // Objetivo principal
+  monthlyLeadsGoal Int?        @map("monthly_leads_goal")
+  targetCplCents  BigInt?      @map("target_cpl_cents")  // CPL alvo
+  targetRoas      Float?       @map("target_roas")
+  monthlyRevenueGoalCents BigInt @default(0) @map("monthly_revenue_goal_cents")
+  ltvCents        BigInt?      @map("ltv_cents")
+  reportFrequency ReportFrequency @default(MENSAL) @map("report_frequency")
+  reportChannel   ReportChannel   @default(WHATSAPP) @map("report_channel")
+  internalNotes   String?      @map("internal_notes")    // Notas internas da equipe
+
+  // ---- Legacy/System fields ----
+  revenueGoalCents BigInt     @default(0) @map("revenue_goal_cents")
+  conversionTrackingEnabled Boolean @default(false) @map("conversion_tracking_enabled")
+  simulationMode  Boolean     @default(true) @map("simulation_mode")
+  wabaAccountId   String?     @map("waba_account_id")
+  wabaDatasetId   String?     @map("waba_dataset_id")
+  isActive        Boolean     @default(true) @map("is_active")
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+
+  // ---- Relations ----
   organization    Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  manager         User?              @relation("ClientManager", fields: [managerId], references: [id], onDelete: SetNull)
   members         ClientMember[]
+  services        ClientService[]
   pixels          ClientPixel[]
   adAccounts      MetaAdAccount[]
   leads           Lead[]
@@ -97,6 +273,7 @@ model Client {
   speakers        Speaker[]
 
   @@unique([organizationId, slug])
+  @@index([organizationId, status])
   @@map("clients")
 }
 
@@ -236,6 +413,12 @@ model Lead {
   tags            String[]        @default([])
   firstSeenAt     DateTime        @default(now()) @map("first_seen_at")
   lastSeenAt      DateTime        @default(now()) @map("last_seen_at")
+  ctwaClid        String?         @map("ctwa_clid")
+  adId            String?         @map("ad_id")
+  adTitle         String?         @map("ad_title")
+  adBody          String?         @map("ad_body")
+  clickTrackingCode String?       @map("click_tracking_code")
+  currentCycle    Int             @default(1) @map("current_cycle")
   createdAt       DateTime        @default(now()) @map("created_at")
   updatedAt       DateTime        @updatedAt @map("updated_at")
 

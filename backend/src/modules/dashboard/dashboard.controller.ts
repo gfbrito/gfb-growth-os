@@ -34,7 +34,8 @@ export async function getAgencyDashboard(req: Request, res: Response): Promise<v
     total: mockDb.tasks.length,
     todo: mockDb.tasks.filter((t) => t.status === "TODO").length,
     inProgress: mockDb.tasks.filter((t) => t.status === "IN_PROGRESS").length,
-    review: mockDb.tasks.filter((t) => t.status === "REVIEW").length,
+    waiting: mockDb.tasks.filter((t) => t.status === "WAITING").length,
+    awaitingApproval: mockDb.tasks.filter((t) => t.status === "AWAITING_APPROVAL").length,
     done: mockDb.tasks.filter((t) => t.status === "DONE").length,
     urgent: mockDb.tasks.filter((t) => t.priority === "URGENT" && t.status !== "DONE").length,
   };
@@ -77,7 +78,18 @@ export async function getAgencyDashboard(req: Request, res: Response): Promise<v
  * Foco: Certeza, Faturamento Real, Vendas e Meta do Mês
  */
 export async function getClientDashboard(req: Request, res: Response): Promise<void> {
-  const clientId = req.params.clientId || "cli_bruna_ppp";
+  const user = req.user as any;
+  let clientId = req.params.clientId || user?.clientId || "cli_bruna_ppp";
+
+  // RBAC Enforcement: Client users cannot access other clients' data
+  if ((user?.growthRole === "CLIENT_OWNER" || user?.growthRole === "CLIENT_ATTENDANT") && user?.clientId) {
+    if (req.params.clientId && req.params.clientId !== user.clientId) {
+      res.status(403).json({ error: { code: "FORBIDDEN", message: "Acesso negado a dados de outro cliente" } });
+      return;
+    }
+    clientId = user.clientId;
+  }
+
   const client = mockDb.clients.find((c) => c.id === clientId || c.slug === clientId);
 
   if (!client) {
